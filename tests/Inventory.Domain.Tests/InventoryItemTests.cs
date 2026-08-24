@@ -34,4 +34,16 @@ public class InventoryItemTests
         Assert.Equal("ORDER-1", stockReserved.OrderId);
         Assert.Equal(4, stockReserved.Quantity);
     }
+
+    [Fact]
+    public void ReserveStock_ExceedingAvailableQuantity_ThrowsInsufficientStockExceptionAndEmitsNoEvent()
+    {
+        var item = InventoryItem.Seed("SKU-1", 10);
+
+        Assert.Throws<InsufficientStockException>(() =>
+            item.Handle(new ReserveStock("SKU-1", "ORDER-1", 11)));
+
+        Assert.Equal(10, item.AvailableQuantity);
+        Assert.Single(item.UncommittedEvents);
+    }
 }

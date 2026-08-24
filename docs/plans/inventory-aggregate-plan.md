@@ -53,7 +53,7 @@ you'd rather go a different way):
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ReserveStock_WithSufficientQuantity_EmitsStockReservedAndReducesAvailableQuantity`
 
-- [ ] 5. Reserve stock — rejected when insufficient available quantity
+- [x] 5. Reserve stock — rejected when insufficient available quantity
       - File(s): `src/Inventory.Domain/InventoryItem.cs`
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ReserveStock_ExceedingAvailableQuantity_ThrowsInsufficientStockExceptionAndEmitsNoEvent`

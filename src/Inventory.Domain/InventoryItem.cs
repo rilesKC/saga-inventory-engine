@@ -27,6 +27,11 @@ public sealed class InventoryItem
 
     public void Handle(ReserveStock command)
     {
+        if (command.Quantity > AvailableQuantity)
+        {
+            throw new InsufficientStockException(command.Sku, command.Quantity, AvailableQuantity);
+        }
+
         var stockReserved = new StockReserved(command.Sku, command.OrderId, command.Quantity);
         Apply(stockReserved);
         _uncommittedEvents.Add(stockReserved);
