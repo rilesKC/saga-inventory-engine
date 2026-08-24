@@ -93,6 +93,20 @@ you'd rather go a different way):
         shared `EventBus` instance
       - Verification: `dotnet build` succeeds; the full solution's existing test suite still
         passes unchanged.
+      - ⚠ Retro: wiring the app together surfaced a real gap the spec's "defer persistence"
+        decision didn't fully reason through — multi-AZ means desired count ≥2, i.e. multiple
+        Fargate instances, each with its own separate in-process `EventBus` and in-memory
+        `InventoryItem`. The shared SQS queue load-balances which instance receives any given
+        message, so a saga's events landing on different instances would silently diverge (one
+        instance reserves stock; a later step lands on a different instance whose copy never saw
+        that reservation). The same multi-instance reasoning that made the idempotency store need
+        to be DynamoDB (shared) rather than in-memory was never applied to `InventoryItem` itself.
+        Resolved by user decision: **scope this deployment to a single Fargate instance (desired
+        count 1)** for now, deferring multi-instance-safe aggregate state to a future persistence
+        spec, rather than pulling persistence into this spec or accepting the correctness gap.
+        Task 17 updated accordingly. The signed-off spec's text is left as-is (not retroactively
+        edited) per this project's established precedent — the plan file, not the spec, is where
+        mid-implementation discoveries and their resolutions get recorded.
 
 ### Terraform (`infra/`)
 
@@ -127,8 +141,12 @@ you'd rather go a different way):
 
 - [ ] 17. ECS cluster and Fargate service module
       - File(s): `infra/modules/compute/*.tf` — ECS cluster, Fargate task definition (referencing
-        the ECR repo, IAM roles, CloudWatch log group), service (desired count ≥2, spread across
-        AZs, registered behind the ALB)
+        the ECR repo, IAM roles, CloudWatch log group), service registered behind the ALB.
+        **Desired count 1, not ≥2** — see task 10's retro flag: `InventoryItem`'s in-memory state
+        isn't shared across instances, so a second instance would silently diverge from the first
+        the moment a saga's events got load-balanced across both. The VPC/subnets/ALB stay
+        multi-AZ-capable regardless (free, no reason not to); only the Fargate instance count is
+        scoped down until a future persistence spec makes multi-instance state safe.
       - Verification: `terraform validate` passes
 
 - [ ] 18. VPC endpoints for NAT cost minimization
