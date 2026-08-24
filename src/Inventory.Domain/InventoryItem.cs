@@ -6,7 +6,8 @@ public sealed class InventoryItem
 
     public string Sku { get; private set; } = string.Empty;
     public int TotalQuantity { get; private set; }
-    public int AvailableQuantity => TotalQuantity;
+    public int ReservedQuantity { get; private set; }
+    public int AvailableQuantity => TotalQuantity - ReservedQuantity;
     public int Version { get; private set; }
 
     public IReadOnlyList<object> UncommittedEvents => _uncommittedEvents;
@@ -24,10 +25,23 @@ public sealed class InventoryItem
         return item;
     }
 
+    public void Handle(ReserveStock command)
+    {
+        var stockReserved = new StockReserved(command.Sku, command.OrderId, command.Quantity);
+        Apply(stockReserved);
+        _uncommittedEvents.Add(stockReserved);
+    }
+
     private void Apply(StockSeeded stockSeeded)
     {
         Sku = stockSeeded.Sku;
         TotalQuantity = stockSeeded.InitialQuantity;
+        Version++;
+    }
+
+    private void Apply(StockReserved stockReserved)
+    {
+        ReservedQuantity += stockReserved.Quantity;
         Version++;
     }
 }

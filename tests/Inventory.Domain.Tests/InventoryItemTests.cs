@@ -20,4 +20,18 @@ public class InventoryItemTests
         Assert.Equal("SKU-1", stockSeeded.Sku);
         Assert.Equal(10, stockSeeded.InitialQuantity);
     }
+
+    [Fact]
+    public void ReserveStock_WithSufficientQuantity_EmitsStockReservedAndReducesAvailableQuantity()
+    {
+        var item = InventoryItem.Seed("SKU-1", 10);
+
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+
+        Assert.Equal(6, item.AvailableQuantity);
+        var stockReserved = Assert.IsType<StockReserved>(item.UncommittedEvents[^1]);
+        Assert.Equal("SKU-1", stockReserved.Sku);
+        Assert.Equal("ORDER-1", stockReserved.OrderId);
+        Assert.Equal(4, stockReserved.Quantity);
+    }
 }

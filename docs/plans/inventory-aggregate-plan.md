@@ -48,7 +48,7 @@ you'd rather go a different way):
         `Seed_SetsAvailableQuantityToInitialQuantity`,
         `Seed_EmitsStockSeededEvent`
 
-- [ ] 4. Reserve stock — happy path
+- [x] 4. Reserve stock — happy path
       - File(s): `src/Inventory.Domain/InventoryItem.cs`
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ReserveStock_WithSufficientQuantity_EmitsStockReservedAndReducesAvailableQuantity`
