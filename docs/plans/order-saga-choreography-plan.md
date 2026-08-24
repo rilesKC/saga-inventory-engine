@@ -31,7 +31,7 @@ you'd rather go a different way):
         `Publish_InvokesSubscribedHandlerWithTheEvent`,
         `Publish_WithNoSubscribers_DoesNothing`
 
-- [ ] 3. Saga-level trigger and notification event types
+- [x] 3. Saga-level trigger and notification event types
       - File(s): `src/OrderSaga.Choreography/SagaEvents.cs` (`OrderPlaced`,
         `StockReservationFailed`, `PaymentCharged`, `PaymentDeclined`, `ShipmentScheduled`)
       - Test: `tests/OrderSaga.Choreography.Tests/SagaEventsTests.cs` —
