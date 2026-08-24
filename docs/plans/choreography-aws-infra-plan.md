@@ -146,7 +146,7 @@ you'd rather go a different way):
         task rather than pointing the health check at something that doesn't exist. Small, but
         another instance of infra work surfacing a gap in already-completed app-code wiring.
 
-- [ ] 17. ECS cluster and Fargate service module
+- [x] 17. ECS cluster and Fargate service module
       - File(s): `infra/modules/compute/*.tf` — ECS cluster, Fargate task definition (referencing
         the ECR repo, IAM roles, CloudWatch log group), service registered behind the ALB.
         **Desired count 1, not ≥2** — see task 10's retro flag: `InventoryItem`'s in-memory state
@@ -155,6 +155,12 @@ you'd rather go a different way):
         multi-AZ-capable regardless (free, no reason not to); only the Fargate instance count is
         scoped down until a future persistence spec makes multi-instance state safe.
       - Verification: `terraform validate` passes
+      - ⚠ Retro: first draft used `depends_on = [var.listener_arn]` to sequence the ECS service
+        after the ALB listener — invalid Terraform (`depends_on` requires a real resource/module
+        reference, not a string variable holding an ARN). Caught before ever running `validate`.
+        Removed the unusable `listener_arn` variable; task 19's root module must instead declare
+        `depends_on = [module.load_balancer]` on this module to get the same ordering guarantee
+        across the module boundary.
 
 - [ ] 18. VPC endpoints for NAT cost minimization
       - File(s): `infra/modules/networking/vpc-endpoints.tf` — ECR (api + dkr), S3 gateway
