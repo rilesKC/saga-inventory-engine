@@ -89,7 +89,7 @@ you'd rather go a different way):
         `OrderPlaced` explicitly as shared infrastructure when task 1 moved `EventBus`, not just
         discovered it here.
 
-- [ ] 10. Saga coordinator — reserve replies
+- [x] 10. Saga coordinator — reserve replies
       - File(s): `src/OrderSaga.Orchestration/SagaCoordinator.cs`
       - Test: `tests/OrderSaga.Orchestration.Tests/SagaCoordinatorTests.cs` —
         `OnStockReservedReply_PublishesChargePaymentCommandWithSagaAmount`,

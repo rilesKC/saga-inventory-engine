@@ -11,6 +11,8 @@ public sealed class SagaCoordinator
     {
         _bus = bus;
         _bus.Subscribe<OrderPlaced>(OnOrderPlaced);
+        _bus.Subscribe<StockReservedReply>(OnStockReservedReply);
+        _bus.Subscribe<StockReservationFailedReply>(OnStockReservationFailedReply);
     }
 
     public SagaStep GetStep(string orderId) => _sagas[orderId].Step;
@@ -21,5 +23,18 @@ public sealed class SagaCoordinator
             orderPlaced.OrderId, orderPlaced.Sku, orderPlaced.Quantity, orderPlaced.Amount, SagaStep.ReservingStock);
 
         _bus.Publish(new ReserveStockCommand(orderPlaced.OrderId, orderPlaced.Sku, orderPlaced.Quantity));
+    }
+
+    private void OnStockReservedReply(StockReservedReply reply)
+    {
+        var saga = _sagas[reply.OrderId];
+        _sagas[reply.OrderId] = saga with { Step = SagaStep.AwaitingPayment };
+        _bus.Publish(new ChargePaymentCommand(reply.OrderId, reply.Sku, saga.Amount));
+    }
+
+    private void OnStockReservationFailedReply(StockReservationFailedReply reply)
+    {
+        var saga = _sagas[reply.OrderId];
+        _sagas[reply.OrderId] = saga with { Step = SagaStep.Failed };
     }
 }
