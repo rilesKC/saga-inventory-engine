@@ -50,7 +50,7 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Orchestration.Tests/CommandsAndRepliesTests.cs` —
         `ReserveStockCommand_RecordsOrderIdSkuAndQuantity`
 
-- [ ] 4. Inventory responder — reserve (happy path + insufficient stock)
+- [x] 4. Inventory responder — reserve (happy path + insufficient stock)
       - File(s): `src/OrderSaga.Orchestration/InventoryResponder.cs`
       - Test: `tests/OrderSaga.Orchestration.Tests/InventoryResponderTests.cs` —
         `OnReserveStockCommand_WithSufficientStock_PublishesStockReservedReply`,
