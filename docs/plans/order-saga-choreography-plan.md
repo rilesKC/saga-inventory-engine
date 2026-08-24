@@ -52,7 +52,7 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Choreography.Tests/InventoryParticipantTests.cs` —
         `OnPaymentCharged_ConfirmsReservationAndPublishesReservationConfirmed`
 
-- [ ] 7. Inventory participant — release on PaymentDeclined
+- [x] 7. Inventory participant — release on PaymentDeclined
       - File(s): `src/OrderSaga.Choreography/InventoryParticipant.cs`
       - Test: `tests/OrderSaga.Choreography.Tests/InventoryParticipantTests.cs` —
         `OnPaymentDeclined_ReleasesReservationAndPublishesReservationReleased`

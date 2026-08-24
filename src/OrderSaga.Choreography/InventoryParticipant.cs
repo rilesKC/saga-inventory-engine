@@ -13,6 +13,7 @@ public sealed class InventoryParticipant
         _items = items;
         _bus.Subscribe<OrderPlaced>(OnOrderPlaced);
         _bus.Subscribe<PaymentCharged>(OnPaymentCharged);
+        _bus.Subscribe<PaymentDeclined>(OnPaymentDeclined);
     }
 
     private void OnOrderPlaced(OrderPlaced orderPlaced)
@@ -39,6 +40,16 @@ public sealed class InventoryParticipant
         var eventCountBefore = item.UncommittedEvents.Count;
 
         item.Handle(new ConfirmReservation(paymentCharged.Sku, paymentCharged.OrderId));
+
+        PublishNewEvents(item, eventCountBefore);
+    }
+
+    private void OnPaymentDeclined(PaymentDeclined paymentDeclined)
+    {
+        var item = _items[paymentDeclined.Sku];
+        var eventCountBefore = item.UncommittedEvents.Count;
+
+        item.Handle(new ReleaseReservation(paymentDeclined.Sku, paymentDeclined.OrderId));
 
         PublishNewEvents(item, eventCountBefore);
     }
