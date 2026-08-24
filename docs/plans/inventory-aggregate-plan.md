@@ -63,7 +63,7 @@ you'd rather go a different way):
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ReserveStock_DuplicateForSameOrderAndSku_ReturnsExistingReservationWithoutReducingAvailableAgain`
 
-- [ ] 7. Confirm reservation — happy path
+- [x] 7. Confirm reservation — happy path
       - File(s): `src/Inventory.Domain/InventoryItem.cs`
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ConfirmReservation_OnReservedHold_EmitsReservationConfirmedAndMovesQuantityToDeducted`

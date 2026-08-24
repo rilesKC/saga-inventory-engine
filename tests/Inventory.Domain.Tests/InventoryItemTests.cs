@@ -58,4 +58,20 @@ public class InventoryItemTests
         Assert.Equal(6, item.AvailableQuantity);
         Assert.Equal(2, item.UncommittedEvents.Count);
     }
+
+    [Fact]
+    public void ConfirmReservation_OnReservedHold_EmitsReservationConfirmedAndMovesQuantityToDeducted()
+    {
+        var item = InventoryItem.Seed("SKU-1", 10);
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+
+        item.Handle(new ConfirmReservation("SKU-1", "ORDER-1"));
+
+        Assert.Equal(6, item.AvailableQuantity);
+        Assert.Equal(4, item.DeductedQuantity);
+        Assert.Equal(0, item.ReservedQuantity);
+        var confirmed = Assert.IsType<ReservationConfirmed>(item.UncommittedEvents[^1]);
+        Assert.Equal("SKU-1", confirmed.Sku);
+        Assert.Equal("ORDER-1", confirmed.OrderId);
+    }
 }

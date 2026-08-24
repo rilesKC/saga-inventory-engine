@@ -4,13 +4,16 @@ public sealed class InventoryItem
 {
     private enum ReservationState { Reserved, Confirmed, Released }
 
+    private sealed record ReservationRecord(int Quantity, ReservationState State);
+
     private readonly List<object> _uncommittedEvents = [];
-    private readonly Dictionary<string, ReservationState> _reservations = [];
+    private readonly Dictionary<string, ReservationRecord> _reservations = [];
 
     public string Sku { get; private set; } = string.Empty;
     public int TotalQuantity { get; private set; }
     public int ReservedQuantity { get; private set; }
-    public int AvailableQuantity => TotalQuantity - ReservedQuantity;
+    public int DeductedQuantity { get; private set; }
+    public int AvailableQuantity => TotalQuantity - ReservedQuantity - DeductedQuantity;
     public int Version { get; private set; }
 
     public IReadOnlyList<object> UncommittedEvents => _uncommittedEvents;
@@ -45,6 +48,13 @@ public sealed class InventoryItem
         _uncommittedEvents.Add(stockReserved);
     }
 
+    public void Handle(ConfirmReservation command)
+    {
+        var reservationConfirmed = new ReservationConfirmed(command.Sku, command.OrderId);
+        Apply(reservationConfirmed);
+        _uncommittedEvents.Add(reservationConfirmed);
+    }
+
     private void Apply(StockSeeded stockSeeded)
     {
         Sku = stockSeeded.Sku;
@@ -54,8 +64,17 @@ public sealed class InventoryItem
 
     private void Apply(StockReserved stockReserved)
     {
-        _reservations[stockReserved.OrderId] = ReservationState.Reserved;
+        _reservations[stockReserved.OrderId] = new ReservationRecord(stockReserved.Quantity, ReservationState.Reserved);
         ReservedQuantity += stockReserved.Quantity;
+        Version++;
+    }
+
+    private void Apply(ReservationConfirmed reservationConfirmed)
+    {
+        var reservation = _reservations[reservationConfirmed.OrderId];
+        _reservations[reservationConfirmed.OrderId] = reservation with { State = ReservationState.Confirmed };
+        ReservedQuantity -= reservation.Quantity;
+        DeductedQuantity += reservation.Quantity;
         Version++;
     }
 }
