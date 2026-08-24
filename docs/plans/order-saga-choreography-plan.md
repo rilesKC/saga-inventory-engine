@@ -77,10 +77,20 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Choreography.Tests/ShippingStubTests.cs` —
         `OnReservationConfirmed_PublishesShipmentScheduled`
 
-- [ ] 10. Integration: full happy path
+- [x] 10. Integration: full happy path
       - File(s): none new (wires tasks 2–9 together in the test)
       - Test: `tests/OrderSaga.Choreography.Tests/OrderSagaChoreographyIntegrationTests.cs` —
         `OrderPlaced_HappyPath_EndsWithShipmentScheduledAndReservationConfirmed`
+      - ⚠ Retro: this integration test caught a real bug that no individual unit test could have —
+        `EventBus`'s depth-first/recursive dispatch let a nested publish (Inventory reacting to
+        `OrderPlaced` by immediately publishing `StockReserved`) run ahead of `PaymentStub`'s own
+        `OrderPlaced` handler, which hadn't recorded the order's `Amount` yet. Fixed as its own
+        commit (breadth-first dispatch via a pending queue) with a direct `EventBus` regression
+        test, not just relying on this integration test to catch a future regression indirectly.
+        Strong evidence for keeping "verify the whole wired system," not just each participant in
+        isolation — every unit test for `InventoryParticipant`/`PaymentStub`/`ShippingStub` passed
+        the whole time, since each one only ever published a single event per test and never
+        exercised a *nested* publish during an in-progress dispatch.
 
 - [ ] 11. Integration: insufficient-stock compensation path
       - File(s): none new
