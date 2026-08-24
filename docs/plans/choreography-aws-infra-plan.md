@@ -120,9 +120,12 @@ you'd rather go a different way):
         policy (small `maxReceiveCount`)
       - Verification: `terraform validate` passes
 
-- [ ] 13. EventBridge bus and rules module
+- [x] 13. EventBridge bus and rules module
       - File(s): `infra/modules/messaging/eventbridge.tf` — custom event bus, one rule per known
         event type, all targeting the SQS queue from task 12
+      - Reminder for task 19 (root wiring): pass `name = "order-saga-choreography"` to this
+        module so the created bus name matches `EventBridgeEventPublisher`'s hardcoded
+        `EventBusName` constant (flagged as a forward-looking note back in task 7's review).
       - Verification: `terraform validate` passes
 
 - [ ] 14. DynamoDB idempotency table module
