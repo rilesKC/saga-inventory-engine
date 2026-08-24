@@ -14,11 +14,16 @@ See [CLAUDE.md](CLAUDE.md) for the full scope, stack rationale, and the patterns
 deliberately built to exercise (idempotency-by-claim, DLQ-backed retry, event sourcing,
 choreography vs. orchestration).
 
+See [docs/choreography-vs-orchestration.md](docs/choreography-vs-orchestration.md) for what the
+tradeoff actually looked like once both were built — concrete differences, a real bug the
+choreography build hit that orchestration structurally couldn't, and where the two map onto a
+real AWS-native stack (Step Functions/EventBridge DAGs).
+
 ## Status
 
-Inventory aggregate (event log + projection) complete — see `docs/specs/inventory-aggregate.md`
-and `docs/plans/inventory-aggregate-plan.md`. Saga coordination layer (choreography, then
-orchestration) is next.
+Inventory aggregate (event log + projection) and both saga implementations (choreography,
+orchestration) complete — all in-process/domain-layer only so far, no real AWS/LocalStack wiring
+yet. See `docs/specs/` and `docs/plans/` for each piece's spec and task breakdown.
 
 ## Development process
 

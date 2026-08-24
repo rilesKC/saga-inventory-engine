@@ -28,10 +28,11 @@ reasoning about it.
 
 - **Language:** C# / .NET 10 — kept familiar on purpose so the new-territory budget goes to the
   event-driven patterns and AWS surface, not a second unfamiliar language at the same time.
-  Cox's stated stack is .NET 8; this repo targets .NET 10 instead to match the SDK actually
-  installed on this machine rather than install a second SDK side-by-side. Net10 is newer, not a
-  downgrade, and ASP.NET Core's middleware/DI/hosted-service concepts this role cares about are
-  stable across that gap — worth naming honestly as a version-not-platform mismatch if it comes up.
+  The target job's stated stack is .NET 8; this repo targets .NET 10 instead to match the SDK
+  actually installed on this machine rather than install a second SDK side-by-side. Net10 is
+  newer, not a downgrade, and ASP.NET Core's middleware/DI/hosted-service concepts this role cares
+  about are stable across that gap — worth naming honestly as a version-not-platform mismatch if it
+  comes up.
 - **Event bus:** AWS EventBridge (or SQS+SNS) — chosen over a general-purpose broker like
   RabbitMQ specifically because it's unfamiliar territory worth closing.
 - **Event store:** MongoDB Atlas, free M0 tier. M0 is already a 3-node replica set under shared
