@@ -111,4 +111,21 @@ public class InventoryItemTests
         Assert.Throws<InvalidReservationStateException>(() =>
             item.Handle(new ReleaseReservation("SKU-1", "ORDER-1")));
     }
+
+    [Fact]
+    public void LoadFromHistory_ReplayingAFullLifecycle_ReconstructsTheSameStateAsLiveMethodCalls()
+    {
+        var live = InventoryItem.Seed("SKU-1", 10);
+        live.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+        live.Handle(new ConfirmReservation("SKU-1", "ORDER-1"));
+
+        var replayed = InventoryItem.LoadFromHistory(live.UncommittedEvents);
+
+        Assert.Equal(live.Sku, replayed.Sku);
+        Assert.Equal(live.TotalQuantity, replayed.TotalQuantity);
+        Assert.Equal(live.ReservedQuantity, replayed.ReservedQuantity);
+        Assert.Equal(live.DeductedQuantity, replayed.DeductedQuantity);
+        Assert.Equal(live.AvailableQuantity, replayed.AvailableQuantity);
+        Assert.Equal(live.Version, replayed.Version);
+    }
 }

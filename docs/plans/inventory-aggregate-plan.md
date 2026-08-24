@@ -88,7 +88,7 @@ you'd rather go a different way):
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ReleaseReservation_AlreadyConfirmed_ThrowsInvalidReservationStateException`
 
-- [ ] 11. Rehydrate the aggregate from its event history
+- [x] 11. Rehydrate the aggregate from its event history
       - File(s): `src/Inventory.Domain/InventoryItem.cs`
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `LoadFromHistory_ReplayingAFullLifecycle_ReconstructsTheSameStateAsLiveMethodCalls`

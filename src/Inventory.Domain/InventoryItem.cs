@@ -31,6 +31,38 @@ public sealed class InventoryItem
         return item;
     }
 
+    public static InventoryItem LoadFromHistory(IEnumerable<object> history)
+    {
+        var item = new InventoryItem();
+        foreach (var @event in history)
+        {
+            item.ApplyHistoryEvent(@event);
+        }
+
+        return item;
+    }
+
+    private void ApplyHistoryEvent(object @event)
+    {
+        switch (@event)
+        {
+            case StockSeeded stockSeeded:
+                Apply(stockSeeded);
+                break;
+            case StockReserved stockReserved:
+                Apply(stockReserved);
+                break;
+            case ReservationConfirmed reservationConfirmed:
+                Apply(reservationConfirmed);
+                break;
+            case ReservationReleased reservationReleased:
+                Apply(reservationReleased);
+                break;
+            default:
+                throw new InvalidOperationException($"Unknown event type: {@event.GetType()}");
+        }
+    }
+
     public void Handle(ReserveStock command)
     {
         if (_reservations.ContainsKey(command.OrderId))
