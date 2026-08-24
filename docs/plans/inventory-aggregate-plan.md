@@ -83,7 +83,7 @@ you'd rather go a different way):
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ConfirmReservation_AlreadyReleased_ThrowsInvalidReservationStateException`
 
-- [ ] 10. Release reservation — rejected if already confirmed
+- [x] 10. Release reservation — rejected if already confirmed
       - File(s): `src/Inventory.Domain/InventoryItem.cs`
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ReleaseReservation_AlreadyConfirmed_ThrowsInvalidReservationStateException`

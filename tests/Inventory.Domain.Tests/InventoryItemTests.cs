@@ -100,4 +100,15 @@ public class InventoryItemTests
         Assert.Throws<InvalidReservationStateException>(() =>
             item.Handle(new ConfirmReservation("SKU-1", "ORDER-1")));
     }
+
+    [Fact]
+    public void ReleaseReservation_AlreadyConfirmed_ThrowsInvalidReservationStateException()
+    {
+        var item = InventoryItem.Seed("SKU-1", 10);
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+        item.Handle(new ConfirmReservation("SKU-1", "ORDER-1"));
+
+        Assert.Throws<InvalidReservationStateException>(() =>
+            item.Handle(new ReleaseReservation("SKU-1", "ORDER-1")));
+    }
 }

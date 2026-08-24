@@ -63,6 +63,12 @@ public sealed class InventoryItem
 
     public void Handle(ReleaseReservation command)
     {
+        var reservation = _reservations[command.OrderId];
+        if (reservation.State != ReservationState.Reserved)
+        {
+            throw new InvalidReservationStateException(command.Sku, command.OrderId, nameof(ReleaseReservation));
+        }
+
         var reservationReleased = new ReservationReleased(command.Sku, command.OrderId);
         Apply(reservationReleased);
         _uncommittedEvents.Add(reservationReleased);
