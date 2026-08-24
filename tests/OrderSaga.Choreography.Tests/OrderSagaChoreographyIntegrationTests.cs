@@ -48,4 +48,21 @@ public class OrderSagaChoreographyIntegrationTests
         Assert.False(paymentOrShippingFired);
         Assert.Equal(10, item.AvailableQuantity);
     }
+
+    [Fact]
+    public void OrderPlaced_PaymentDeclined_ReleasesReservationAndNeverReachesShipping()
+    {
+        var (bus, item) = WireSaga("SKU-1", 10, 500m);
+        ReservationReleased? released = null;
+        bus.Subscribe<ReservationReleased>(e => released = e);
+        var shippingFired = false;
+        bus.Subscribe<ShipmentScheduled>(_ => shippingFired = true);
+
+        bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 999.99m));
+
+        Assert.NotNull(released);
+        Assert.Equal("ORDER-1", released.OrderId);
+        Assert.False(shippingFired);
+        Assert.Equal(10, item.AvailableQuantity);
+    }
 }

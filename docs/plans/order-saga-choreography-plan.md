@@ -97,7 +97,7 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Choreography.Tests/OrderSagaChoreographyIntegrationTests.cs` —
         `OrderPlaced_InsufficientStock_PublishesFailureAndNeverReachesPaymentOrShipping`
 
-- [ ] 12. Integration: payment-declined compensation path
+- [x] 12. Integration: payment-declined compensation path
       - File(s): none new
       - Test: `tests/OrderSaga.Choreography.Tests/OrderSagaChoreographyIntegrationTests.cs` —
         `OrderPlaced_PaymentDeclined_ReleasesReservationAndNeverReachesShipping`
