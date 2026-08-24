@@ -12,4 +12,8 @@
     <ProjectReference Include="..\OrderSaga.Choreography\OrderSaga.Choreography.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.EventBridge" Version="4.0.100.10" />
+  </ItemGroup>
+
 </Project>

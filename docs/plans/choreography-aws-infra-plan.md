@@ -69,7 +69,7 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Choreography.Host.Tests/OrderIntakeHandlerTests.cs` —
         `Handle_ValidRequest_PublishesOrderPlacedViaEventPublisher`
 
-- [ ] 7. Real EventBridge-backed `IEventPublisher`
+- [x] 7. Real EventBridge-backed `IEventPublisher`
       - File(s): `src/OrderSaga.Choreography.Host/EventBridgeEventPublisher.cs`
       - Verification: compiles against the AWS SDK's `IAmazonEventBridge`; real behavior verified
         via LocalStack (task 21), not a unit test — thin wrapper over `PutEventsAsync` with no
