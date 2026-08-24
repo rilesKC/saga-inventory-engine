@@ -5,7 +5,18 @@ namespace OrderSaga.Choreography.Host.Tests;
 
 public class SqsMessageProcessorTests
 {
-    private static string ToRawBody(EventEnvelope envelope) => JsonSerializer.Serialize(envelope);
+    // Matches the real shape of an SQS message delivered by an EventBridge rule target: the full
+    // EventBridge event structure, with our EventEnvelope nested under "detail" -- not the
+    // envelope directly. A LocalStack run caught that this test's original shape (the envelope as
+    // the whole body) didn't match reality and let a real bug through.
+    private static string ToRawBody(EventEnvelope envelope) => JsonSerializer.Serialize(new
+    {
+        version = "0",
+        id = Guid.NewGuid().ToString(),
+        detail_type = envelope.EventType,
+        source = "order-saga-choreography.host",
+        detail = envelope,
+    });
 
     [Fact]
     public void ProcessMessage_NewEnvelope_ClaimsAndDispatchesToEventBus()

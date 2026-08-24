@@ -21,8 +21,15 @@ public sealed class SqsMessageProcessor
 
     public void ProcessMessage(string rawBody)
     {
-        var envelope = JsonSerializer.Deserialize<EventEnvelope>(rawBody)
-            ?? throw new InvalidOperationException("SQS message body did not deserialize to an EventEnvelope.");
+        // The raw SQS message body is the full EventBridge event structure (version, id,
+        // detail-type, source, account, time, region, detail, ...), not our EventEnvelope
+        // directly -- EventBridgeEventPublisher's Detail string gets re-embedded as the nested
+        // "detail" object. Deserializing rawBody straight into EventEnvelope silently produced a
+        // null MessageId (no matching top-level property), which DynamoDB then rejected as an
+        // empty AttributeValue -- caught only by actually running this against LocalStack.
+        using var document = JsonDocument.Parse(rawBody);
+        var envelope = document.RootElement.GetProperty("detail").Deserialize<EventEnvelope>()
+            ?? throw new InvalidOperationException("SQS message's EventBridge 'detail' did not deserialize to an EventEnvelope.");
 
         if (!_idempotencyStore.TryClaim(envelope.MessageId))
         {

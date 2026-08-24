@@ -196,13 +196,57 @@ you'd rather go a different way):
 
 ### Validation
 
-- [ ] 21. LocalStack validation
-      - File(s): `infra/localstack.tf` or equivalent LocalStack-specific override/config,
-        `docs/localstack-setup.md` (or similar) documenting how to run it
-      - Verification: `terraform apply` against LocalStack succeeds; one full saga run through the
-        HTTP intake endpoint (LocalStack-backed EventBridge/SQS/DynamoDB) ends with the same
-        observable outcome as the existing in-process integration tests (happy path, both
-        compensation paths) — confirmed manually, not as an automated xUnit test.
+- [x] 21. LocalStack validation (scope adjusted -- see retro)
+      - File(s): `docker-compose.localstack.yml` (repo root), `docs/localstack-setup.md`
+      - Verification: `terraform apply` against LocalStack succeeds for the `messaging` and
+        `idempotency` modules only (not the whole root module); the Host application run locally
+        via `dotnet run` (not containerized, not through ECS), configured to point at LocalStack's
+        endpoint, completes one full saga run through the HTTP intake endpoint with the same
+        observable outcome as the existing in-process integration tests — confirmed manually, not
+        an automated xUnit test.
+      - ⚠ Retro: LocalStack's free Community edition doesn't actually emulate VPC/ALB/ECS/ECR --
+        those require LocalStack Pro, and it now also requires a free account/auth token just to
+        run at all (not just for Pro features) -- a real, current-state surprise, resolved by the
+        user creating a free account and the token being wired into a gitignored `.env` file, never
+        committed. Running `terraform apply` against the whole root module would have failed or
+        silently no-op'd on those resources. Resolved by user decision: validate only the modules
+        with real custom application logic riding on them (messaging,
+        idempotency), and run the Host app locally rather than through ECS to exercise the actual
+        AWS SDK integration code. The VPC/ALB/ECS Terraform (already `terraform validate`-clean)
+        gets its real test in task 22's actual AWS deploy instead.
+      - ⚠ Retro: this run found and fixed three real bugs that no unit test could have — the whole
+        reason this task's adjusted scope (run against real EventBridge/SQS/DynamoDB) still mattered
+        despite not covering the VPC/ALB/ECS layer:
+        1. **SQS message shape.** `SqsMessageProcessor` deserialized the raw SQS body directly as
+           `EventEnvelope`, but a message delivered by an EventBridge rule target is the *full*
+           EventBridge event structure, with the envelope nested under `"detail"`. `MessageId` came
+           back null, which DynamoDB rejected as an empty `AttributeValue`. Fixed by parsing the
+           `detail` property first. Existing unit tests passed because their fake message bodies
+           were shaped like the envelope directly, not like a real EventBridge event — updated them
+           to match reality.
+        2. **Unbounded republish loop.** `OutboundEventForwarder` and every participant shared one
+           `EventBus`. The poller delivering a message via `EventBus.Publish` triggered *both* the
+           intended participant reaction *and* the forwarder re-sending that same event back to
+           EventBridge — which came back as a new message and repeated forever. Worse, participants
+           were also reacting to each other directly and synchronously in-process, completely
+           bypassing the SQS round-trip the spec calls for, so a step could be processed twice even
+           with re-forwarding suppressed. Fixed with a genuine two-bus separation (inbound: poller →
+           participants; outbound: participants → forwarder) — see `InventoryParticipant`'s
+           constructor doc comment for the full reasoning. This touched already-tested code from the
+           *earlier* choreography plan (`InventoryParticipant`, `PaymentStub`, `ShippingStub`), not
+           just this plan's own files — a cross-plan correction, done deliberately and reviewed, not
+           silently.
+        3. **Unhandled exception crashing the whole host.** `response.Messages` came back `null`
+           (not an empty list) on an empty LocalStack poll; the resulting `NullReferenceException`
+           wasn't caught by the per-message `try`/`catch` (it happened in the `foreach` itself) and
+           took the entire application down, since `HostOptions.BackgroundServiceExceptionBehavior`
+           defaults to `StopHost`. Fixed with a null-coalescing guard and an outer `try`/`catch`
+           around the whole poll iteration, so a transient AWS SDK error degrades to a retry-after-
+           delay instead of killing the app.
+        Final verification: happy path, insufficient-stock, and payment-declined all run cleanly —
+        11 total idempotency claims (5 + 2 + 4, exactly matching each path's expected event count),
+        both the main queue and DLQ empty afterward. Confirmed via direct SQS/DynamoDB query API
+        calls (no AWS CLI installed), not just log inspection.
 
 - [ ] 22. Real AWS deployment
       - File(s): none new

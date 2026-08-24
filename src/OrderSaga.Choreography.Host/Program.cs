@@ -49,21 +49,32 @@ builder.Services.AddSingleton<IAmazonDynamoDB>(_ =>
 builder.Services.AddSingleton<IEventPublisher, EventBridgeEventPublisher>();
 builder.Services.AddSingleton<IIdempotencyStore, DynamoDbIdempotencyStore>();
 
-builder.Services.AddSingleton<EventBus>();
+// Two separate buses, deliberately -- see InventoryParticipant's constructor doc comment.
+// SqsMessageProcessor publishes only to `inboundBus`, which every participant subscribes to;
+// participants publish their produced events only to `outboundBus`, which only
+// OutboundEventForwarder subscribes to. Sharing one bus for both directions caused every
+// participant to also react to sibling participants directly and synchronously, in-process,
+// completely bypassing the SQS round-trip the spec calls for -- an unbounded republish loop,
+// discovered only by actually running this against LocalStack, not by any unit test.
+var inboundBus = new EventBus();
+var outboundBus = new EventBus();
 
 // No persistence yet (deferred per spec) -- seed a fixed starting inventory for the demo SKU on
 // every process start.
-builder.Services.AddSingleton(_ => new Dictionary<string, InventoryItem>
+var items = new Dictionary<string, InventoryItem>
 {
     ["SKU-1"] = InventoryItem.Seed("SKU-1", 100),
-});
+};
 
-builder.Services.AddSingleton<InventoryParticipant>();
-builder.Services.AddSingleton(sp => new PaymentStub(sp.GetRequiredService<EventBus>(), threshold: 500m));
-builder.Services.AddSingleton<ShippingStub>();
-builder.Services.AddSingleton<OutboundEventForwarder>();
+// Constructed directly (not via DI) since their constructors' only real job is subscribing to
+// inboundBus -- that subscription keeps them alive for as long as inboundBus does, which outlives
+// the whole application via the SqsMessageProcessor singleton below.
+_ = new InventoryParticipant(inboundBus, outboundBus, items);
+_ = new PaymentStub(inboundBus, outboundBus, threshold: 500m);
+_ = new ShippingStub(inboundBus, outboundBus);
 
-builder.Services.AddSingleton<SqsMessageProcessor>();
+builder.Services.AddSingleton(sp => new OutboundEventForwarder(outboundBus, sp.GetRequiredService<IEventPublisher>()));
+builder.Services.AddSingleton(sp => new SqsMessageProcessor(inboundBus, sp.GetRequiredService<IIdempotencyStore>()));
 builder.Services.AddSingleton<OrderIntakeHandler>();
 
 var queueUrl = builder.Configuration["Sqs:QueueUrl"]
@@ -77,12 +88,9 @@ builder.Services.AddHostedService(sp => new SqsPollingBackgroundService(
 
 var app = builder.Build();
 
-// Eagerly construct the participants and forwarder so their EventBus subscriptions are wired up
-// before any request or SQS message arrives -- they're never otherwise resolved from the
-// container, since nothing calls their methods directly.
-_ = app.Services.GetRequiredService<InventoryParticipant>();
-_ = app.Services.GetRequiredService<PaymentStub>();
-_ = app.Services.GetRequiredService<ShippingStub>();
+// Eagerly construct the forwarder so its EventBus subscription is wired up before any SQS message
+// arrives -- it's never otherwise resolved from the container, since nothing calls its methods
+// directly. Participants are already constructed above, directly.
 _ = app.Services.GetRequiredService<OutboundEventForwarder>();
 
 app.MapGet("/health", () => Results.Ok());

@@ -9,9 +9,9 @@ public class OrderSagaChoreographyIntegrationTests
     {
         var bus = new EventBus();
         var item = InventoryItem.Seed(sku, initialQuantity);
-        _ = new InventoryParticipant(bus, new Dictionary<string, InventoryItem> { [sku] = item });
-        _ = new PaymentStub(bus, threshold);
-        _ = new ShippingStub(bus);
+        _ = new InventoryParticipant(bus, bus, new Dictionary<string, InventoryItem> { [sku] = item });
+        _ = new PaymentStub(bus, bus, threshold);
+        _ = new ShippingStub(bus, bus);
         return (bus, item);
     }
 
