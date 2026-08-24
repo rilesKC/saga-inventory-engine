@@ -72,7 +72,7 @@ you'd rather go a different way):
         triggers it" for future saga specs, same lesson as task 12's event-schema gap but one
         layer up (participant-level correlation instead of event-shape completeness).
 
-- [ ] 9. Shipping stub — always succeeds
+- [x] 9. Shipping stub — always succeeds
       - File(s): `src/OrderSaga.Choreography/ShippingStub.cs`
       - Test: `tests/OrderSaga.Choreography.Tests/ShippingStubTests.cs` —
         `OnReservationConfirmed_PublishesShipmentScheduled`
