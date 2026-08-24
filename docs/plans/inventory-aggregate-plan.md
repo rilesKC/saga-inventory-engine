@@ -35,7 +35,7 @@ you'd rather go a different way):
         now resolved, but worth having future scaffolding-style tasks budget for SDK/tooling
         surprises rather than assuming they're pure mechanical setup.
 
-- [ ] 2. Define the command and event record types
+- [x] 2. Define the command and event record types
       - File(s): `src/Inventory.Domain/Commands.cs` (`ReserveStock`, `ConfirmReservation`,
         `ReleaseReservation`), `src/Inventory.Domain/Events.cs` (`StockSeeded`, `StockReserved`,
         `ReservationConfirmed`, `ReservationReleased`)
