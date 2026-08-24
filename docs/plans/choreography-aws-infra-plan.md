@@ -162,11 +162,20 @@ you'd rather go a different way):
         `depends_on = [module.load_balancer]` on this module to get the same ordering guarantee
         across the module boundary.
 
-- [ ] 18. VPC endpoints for NAT cost minimization
-      - File(s): `infra/modules/networking/vpc-endpoints.tf` — ECR (api + dkr), S3 gateway
-        endpoint (for ECR image layers), CloudWatch Logs; exact endpoint list finalized here based
-        on what task 17's Fargate service actually needs
+- [x] 18. Internet egress for the private subnets
+      - File(s): `infra/modules/networking/egress.tf` (renamed from the plan's original
+        `vpc-endpoints.tf`) — free S3 and DynamoDB gateway endpoints, plus a single (not per-AZ)
+        NAT Gateway for everything else (ECR pulls, CloudWatch Logs, EventBridge, SQS)
       - Verification: `terraform validate` passes
+      - ⚠ Retro: the plan's original framing ("VPC endpoints for NAT cost minimization") assumed
+        interface endpoints are always cheaper than NAT. At this deployment's real scale (a single
+        instance, near-zero traffic), five interface endpoints (ECR api+dkr, Logs, EventBridge,
+        SQS) across 2 AZs cost more per month (~$73) than one NAT Gateway (~$32) — the fixed
+        hourly cost per endpoint-per-AZ dominates when there's no real traffic volume for the
+        interface endpoints' cheaper per-GB rate to offset. Resolved by user decision: gateway
+        endpoints (genuinely free) for S3/DynamoDB, one single NAT Gateway for the rest. Worth
+        remembering as a general lesson, not just for this project: "VPC endpoints beat NAT" is a
+        real-traffic-scale rule of thumb, not a universal one.
 
 - [ ] 19. Root module wiring
       - File(s): `infra/main.tf`, `infra/variables.tf`, `infra/outputs.tf` — composes all modules

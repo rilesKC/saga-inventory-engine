@@ -1,7 +1,9 @@
-# No NAT Gateway here, deliberately -- the private subnets' route table has no default route to
-# the internet. Task 18 adds VPC endpoints (ECR, S3 gateway, CloudWatch Logs, and the AWS services
-# this project talks to) covering what the Fargate service actually needs, keeping NAT Gateway
-# cost out of this deployment entirely rather than paying for one per AZ.
+# The private subnets' route table gets its internet-egress route in egress.tf (task 18), not
+# here -- a single NAT Gateway plus free gateway endpoints for S3/DynamoDB, not one NAT per AZ.
+# Considered VPC interface endpoints for everything (ECR/Logs/EventBridge/SQS) instead of any NAT
+# at all, but at this deployment's real scale (single instance, near-zero traffic) five interface
+# endpoints across 2 AZs cost more per month than one NAT Gateway -- the "endpoints beat NAT"
+# rule of thumb assumes real traffic volume this deployment doesn't have.
 
 resource "aws_vpc" "this" {
   cidr_block           = var.vpc_cidr
