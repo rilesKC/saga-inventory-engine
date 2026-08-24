@@ -128,7 +128,7 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Orchestration.Tests/OrderSagaOrchestrationIntegrationTests.cs` —
         `OrderPlaced_InsufficientStock_MarksSagaFailedAndNeverReachesPaymentOrShipping`
 
-- [ ] 16. Integration: payment-declined compensation path
+- [x] 16. Integration: payment-declined compensation path
       - File(s): none new
       - Test: `tests/OrderSaga.Orchestration.Tests/OrderSagaOrchestrationIntegrationTests.cs` —
         `OrderPlaced_PaymentDeclined_MarksSagaCompensatedAndNeverReachesShipping`

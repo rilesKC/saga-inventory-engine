@@ -45,4 +45,18 @@ public class OrderSagaOrchestrationIntegrationTests
         Assert.False(paymentOrShippingFired);
         Assert.Equal(10, item.AvailableQuantity);
     }
+
+    [Fact]
+    public void OrderPlaced_PaymentDeclined_MarksSagaCompensatedAndNeverReachesShipping()
+    {
+        var (bus, coordinator, item) = WireSaga("SKU-1", 10, 500m);
+        var shippingFired = false;
+        bus.Subscribe<ShipmentScheduledReply>(_ => shippingFired = true);
+
+        bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 999.99m));
+
+        Assert.Equal(SagaStep.Compensated, coordinator.GetStep("ORDER-1"));
+        Assert.False(shippingFired);
+        Assert.Equal(10, item.AvailableQuantity);
+    }
 }
