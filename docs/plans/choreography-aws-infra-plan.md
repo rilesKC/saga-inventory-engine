@@ -64,7 +64,7 @@ you'd rather go a different way):
         `ProcessMessage_NewEnvelope_ClaimsAndDispatchesToEventBus`,
         `ProcessMessage_DuplicateMessageId_SkipsDispatch`
 
-- [ ] 6. HTTP intake handler
+- [x] 6. HTTP intake handler
       - File(s): `src/OrderSaga.Choreography.Host/OrderIntakeHandler.cs`
       - Test: `tests/OrderSaga.Choreography.Host.Tests/OrderIntakeHandlerTests.cs` —
         `Handle_ValidRequest_PublishesOrderPlacedViaEventPublisher`
