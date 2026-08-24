@@ -128,7 +128,7 @@ you'd rather go a different way):
         `EventBusName` constant (flagged as a forward-looking note back in task 7's review).
       - Verification: `terraform validate` passes
 
-- [ ] 14. DynamoDB idempotency table module
+- [x] 14. DynamoDB idempotency table module
       - File(s): `infra/modules/idempotency/dynamodb.tf`
       - Verification: `terraform validate` passes
 
