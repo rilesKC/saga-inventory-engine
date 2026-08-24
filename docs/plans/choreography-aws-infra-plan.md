@@ -52,7 +52,7 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Choreography.Host.Tests/InMemoryIdempotencyStoreTests.cs` —
         `TryClaim_FirstTime_ReturnsTrue`, `TryClaim_DuplicateMessageId_ReturnsFalse`
 
-- [ ] 4. Outbound event forwarder
+- [x] 4. Outbound event forwarder
       - File(s): `src/OrderSaga.Choreography.Host/IEventPublisher.cs`,
         `src/OrderSaga.Choreography.Host/OutboundEventForwarder.cs`
       - Test: `tests/OrderSaga.Choreography.Host.Tests/OutboundEventForwarderTests.cs` —
