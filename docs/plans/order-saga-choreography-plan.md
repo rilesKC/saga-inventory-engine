@@ -57,11 +57,20 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Choreography.Tests/InventoryParticipantTests.cs` —
         `OnPaymentDeclined_ReleasesReservationAndPublishesReservationReleased`
 
-- [ ] 8. Payment stub — threshold rule
+- [x] 8. Payment stub — threshold rule
       - File(s): `src/OrderSaga.Choreography/PaymentStub.cs`
       - Test: `tests/OrderSaga.Choreography.Tests/PaymentStubTests.cs` —
         `OnStockReserved_AmountAtOrBelowThreshold_PublishesPaymentCharged`,
         `OnStockReserved_AmountAboveThreshold_PublishesPaymentDeclined`
+      - ⚠ Retro: the plan's design notes didn't anticipate that `StockReserved` (Inventory's own
+        event) doesn't carry `Amount` — correctly, since dollar amount isn't an Inventory concern —
+        so `PaymentStub` can't evaluate its threshold from `StockReserved` alone. Fixed by also
+        subscribing to `OrderPlaced` to remember `Amount` per `OrderId`, then correlating it back
+        on `StockReserved`. This is a real saga-choreography pattern (participants correlating
+        state across multiple events by a shared ID), not a workaround — worth having `/plan`
+        explicitly ask "does this participant need data from an event other than the one that
+        triggers it" for future saga specs, same lesson as task 12's event-schema gap but one
+        layer up (participant-level correlation instead of event-shape completeness).
 
 - [ ] 9. Shipping stub — always succeeds
       - File(s): `src/OrderSaga.Choreography/ShippingStub.cs`
