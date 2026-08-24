@@ -123,7 +123,7 @@ you'd rather go a different way):
         `InventoryParticipant` and `PaymentStub` both reacted to `OrderPlaced` — a real structural
         difference between the two coordination styles' exposure to that class of bug.
 
-- [ ] 15. Integration: insufficient-stock compensation path
+- [x] 15. Integration: insufficient-stock compensation path
       - File(s): none new
       - Test: `tests/OrderSaga.Orchestration.Tests/OrderSagaOrchestrationIntegrationTests.cs` —
         `OrderPlaced_InsufficientStock_MarksSagaFailedAndNeverReachesPaymentOrShipping`
