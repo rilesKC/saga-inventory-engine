@@ -31,7 +31,7 @@ you'd rather go a different way):
 
 ### App code (`src/OrderSaga.Choreography.Host`)
 
-- [ ] 1. Scaffold the Host project and test project
+- [x] 1. Scaffold the Host project and test project
       - File(s): `src/OrderSaga.Choreography.Host/OrderSaga.Choreography.Host.csproj` (ASP.NET
         Core minimal API, references `OrderSaga.Choreography`, `OrderSaga.Shared`,
         `Inventory.Domain`), `tests/OrderSaga.Choreography.Host.Tests/OrderSaga.Choreography.Host.Tests.csproj`,
