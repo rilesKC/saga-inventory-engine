@@ -80,7 +80,7 @@ you'd rather go a different way):
       - Verification: compiles against the AWS SDK's `IAmazonDynamoDB`; real behavior (the
         conditional-write claim semantics) verified via LocalStack (task 21), not a unit test.
 
-- [ ] 9. SQS polling background service
+- [x] 9. SQS polling background service
       - File(s): `src/OrderSaga.Choreography.Host/SqsPollingBackgroundService.cs`
       - Verification: compiles against the AWS SDK's `IAmazonSQS`; wraps `SqsMessageProcessor`
         (already unit-tested in task 5) with the actual receive/delete loop. Real behavior

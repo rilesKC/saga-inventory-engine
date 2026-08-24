@@ -15,6 +15,7 @@
   <ItemGroup>
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="4.0.103.4" />
     <PackageReference Include="AWSSDK.EventBridge" Version="4.0.100.10" />
+    <PackageReference Include="AWSSDK.SQS" Version="4.0.100.10" />
   </ItemGroup>
 
 </Project>
