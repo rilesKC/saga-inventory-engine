@@ -19,7 +19,7 @@ you'd rather go a different way):
 
 ## Tasks
 
-- [ ] 1. Scaffold the project and test project
+- [x] 1. Scaffold the project and test project
       - File(s): `src/OrderSaga.Choreography/OrderSaga.Choreography.csproj`,
         `tests/OrderSaga.Choreography.Tests/OrderSaga.Choreography.Tests.csproj` (references
         `Inventory.Domain`), added to `InventoryEngine.slnx`

@@ -1,8 +1,10 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Inventory.Domain/Inventory.Domain.csproj" />
+    <Project Path="src/OrderSaga.Choreography/OrderSaga.Choreography.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Inventory.Domain.Tests/Inventory.Domain.Tests.csproj" />
+    <Project Path="tests/OrderSaga.Choreography.Tests/OrderSaga.Choreography.Tests.csproj" />
   </Folder>
 </Solution>
