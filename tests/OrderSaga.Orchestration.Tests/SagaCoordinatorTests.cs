@@ -50,4 +50,38 @@ public class SagaCoordinatorTests
 
         Assert.Equal(SagaStep.Failed, coordinator.GetStep("ORDER-1"));
     }
+
+    [Fact]
+    public void OnPaymentChargedReply_PublishesConfirmReservationCommand()
+    {
+        var bus = new EventBus();
+        var coordinator = new SagaCoordinator(bus);
+        bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
+        ConfirmReservationCommand? published = null;
+        bus.Subscribe<ConfirmReservationCommand>(e => published = e);
+
+        bus.Publish(new PaymentChargedReply("ORDER-1", "SKU-1"));
+
+        Assert.NotNull(published);
+        Assert.Equal("ORDER-1", published.OrderId);
+        Assert.Equal("SKU-1", published.Sku);
+        Assert.Equal(SagaStep.Confirming, coordinator.GetStep("ORDER-1"));
+    }
+
+    [Fact]
+    public void OnPaymentDeclinedReply_PublishesReleaseReservationCommand()
+    {
+        var bus = new EventBus();
+        var coordinator = new SagaCoordinator(bus);
+        bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 999.99m));
+        ReleaseReservationCommand? published = null;
+        bus.Subscribe<ReleaseReservationCommand>(e => published = e);
+
+        bus.Publish(new PaymentDeclinedReply("ORDER-1", "SKU-1"));
+
+        Assert.NotNull(published);
+        Assert.Equal("ORDER-1", published.OrderId);
+        Assert.Equal("SKU-1", published.Sku);
+        Assert.Equal(SagaStep.Compensating, coordinator.GetStep("ORDER-1"));
+    }
 }

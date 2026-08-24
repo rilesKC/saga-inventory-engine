@@ -95,7 +95,7 @@ you'd rather go a different way):
         `OnStockReservedReply_PublishesChargePaymentCommandWithSagaAmount`,
         `OnStockReservationFailedReply_MarksSagaFailed`
 
-- [ ] 11. Saga coordinator — payment replies
+- [x] 11. Saga coordinator — payment replies
       - File(s): `src/OrderSaga.Orchestration/SagaCoordinator.cs`
       - Test: `tests/OrderSaga.Orchestration.Tests/SagaCoordinatorTests.cs` —
         `OnPaymentChargedReply_PublishesConfirmReservationCommand`,
