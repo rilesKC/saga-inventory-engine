@@ -13,6 +13,7 @@ public sealed class InventoryResponder
         _bus = bus;
         _items = items;
         _bus.Subscribe<ReserveStockCommand>(OnReserveStockCommand);
+        _bus.Subscribe<ConfirmReservationCommand>(OnConfirmReservationCommand);
     }
 
     private void OnReserveStockCommand(ReserveStockCommand command)
@@ -30,5 +31,12 @@ public sealed class InventoryResponder
         }
 
         _bus.Publish(new StockReservedReply(command.OrderId, command.Sku));
+    }
+
+    private void OnConfirmReservationCommand(ConfirmReservationCommand command)
+    {
+        var item = _items[command.Sku];
+        item.Handle(new ConfirmReservation(command.Sku, command.OrderId));
+        _bus.Publish(new ReservationConfirmedReply(command.OrderId, command.Sku));
     }
 }

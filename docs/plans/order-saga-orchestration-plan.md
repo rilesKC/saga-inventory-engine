@@ -56,7 +56,7 @@ you'd rather go a different way):
         `OnReserveStockCommand_WithSufficientStock_PublishesStockReservedReply`,
         `OnReserveStockCommand_WithInsufficientStock_PublishesStockReservationFailedReply`
 
-- [ ] 5. Inventory responder — confirm on ConfirmReservationCommand
+- [x] 5. Inventory responder — confirm on ConfirmReservationCommand
       - File(s): `src/OrderSaga.Orchestration/InventoryResponder.cs`
       - Test: `tests/OrderSaga.Orchestration.Tests/InventoryResponderTests.cs` —
         `OnConfirmReservationCommand_ConfirmsReservationAndPublishesReservationConfirmedReply`
