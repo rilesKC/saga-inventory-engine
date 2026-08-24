@@ -47,7 +47,7 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Choreography.Tests/InventoryParticipantTests.cs` —
         `OnOrderPlaced_WithInsufficientStock_PublishesStockReservationFailed`
 
-- [ ] 6. Inventory participant — confirm on PaymentCharged
+- [x] 6. Inventory participant — confirm on PaymentCharged
       - File(s): `src/OrderSaga.Choreography/InventoryParticipant.cs`
       - Test: `tests/OrderSaga.Choreography.Tests/InventoryParticipantTests.cs` —
         `OnPaymentCharged_ConfirmsReservationAndPublishesReservationConfirmed`
