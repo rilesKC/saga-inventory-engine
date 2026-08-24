@@ -177,7 +177,7 @@ you'd rather go a different way):
         remembering as a general lesson, not just for this project: "VPC endpoints beat NAT" is a
         real-traffic-scale rule of thumb, not a universal one.
 
-- [ ] 19. Root module wiring
+- [x] 19. Root module wiring
       - File(s): `infra/main.tf`, `infra/variables.tf`, `infra/outputs.tf` — composes all modules
         (11-18) together with proper references
       - Verification: `terraform validate` passes on the complete configuration
