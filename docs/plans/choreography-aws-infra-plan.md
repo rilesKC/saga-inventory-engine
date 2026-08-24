@@ -45,7 +45,7 @@ you'd rather go a different way):
         `Serialize_OrderPlaced_ProducesEnvelopeWithEventTypeMessageIdAndPayload`,
         `Deserialize_EnvelopeWithOrderPlacedType_ReconstructsOriginalEvent`
 
-- [ ] 3. Idempotency store abstraction + in-memory fake
+- [x] 3. Idempotency store abstraction + in-memory fake
       - File(s): `src/OrderSaga.Choreography.Host/IIdempotencyStore.cs`,
         `src/OrderSaga.Choreography.Host/InMemoryIdempotencyStore.cs` (test double, not
         production code — production uses the DynamoDB-backed implementation from task 8)
