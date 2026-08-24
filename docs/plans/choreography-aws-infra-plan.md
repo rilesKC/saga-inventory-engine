@@ -75,7 +75,7 @@ you'd rather go a different way):
         via LocalStack (task 21), not a unit test — thin wrapper over `PutEventsAsync` with no
         independent logic.
 
-- [ ] 8. Real DynamoDB-backed `IIdempotencyStore`
+- [x] 8. Real DynamoDB-backed `IIdempotencyStore`
       - File(s): `src/OrderSaga.Choreography.Host/DynamoDbIdempotencyStore.cs`
       - Verification: compiles against the AWS SDK's `IAmazonDynamoDB`; real behavior (the
         conditional-write claim semantics) verified via LocalStack (task 21), not a unit test.
