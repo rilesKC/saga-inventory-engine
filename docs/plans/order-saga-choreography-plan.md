@@ -42,7 +42,7 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Choreography.Tests/InventoryParticipantTests.cs` —
         `OnOrderPlaced_WithSufficientStock_PublishesStockReserved`
 
-- [ ] 5. Inventory participant — insufficient stock publishes a failure notification
+- [x] 5. Inventory participant — insufficient stock publishes a failure notification
       - File(s): `src/OrderSaga.Choreography/InventoryParticipant.cs`
       - Test: `tests/OrderSaga.Choreography.Tests/InventoryParticipantTests.cs` —
         `OnOrderPlaced_WithInsufficientStock_PublishesStockReservationFailed`

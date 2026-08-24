@@ -19,7 +19,15 @@ public sealed class InventoryParticipant
         var item = _items[orderPlaced.Sku];
         var eventCountBefore = item.UncommittedEvents.Count;
 
-        item.Handle(new ReserveStock(orderPlaced.Sku, orderPlaced.OrderId, orderPlaced.Quantity));
+        try
+        {
+            item.Handle(new ReserveStock(orderPlaced.Sku, orderPlaced.OrderId, orderPlaced.Quantity));
+        }
+        catch (InsufficientStockException)
+        {
+            _bus.Publish(new StockReservationFailed(orderPlaced.OrderId, orderPlaced.Sku));
+            return;
+        }
 
         PublishNewEvents(item, eventCountBefore);
     }
