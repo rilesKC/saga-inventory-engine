@@ -89,7 +89,7 @@ sequence it fits. More change surface, concentrated in one file — a real coupl
 the reason `SagaCoordinator.cs` stays a complete, honest description of the saga rather than a
 partial one.
 
-## Mapping to Cox's actual stack
+## Mapping to a real AWS-native stack
 
 This project's in-process `EventBus` is a stand-in for real infrastructure, but the shapes map
 directly: orchestration here is the same idea as an AWS Step Functions state machine (or an

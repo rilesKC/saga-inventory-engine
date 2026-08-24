@@ -16,8 +16,8 @@ choreography vs. orchestration).
 
 See [docs/choreography-vs-orchestration.md](docs/choreography-vs-orchestration.md) for what the
 tradeoff actually looked like once both were built — concrete differences, a real bug the
-choreography build hit that orchestration structurally couldn't, and where the two map onto
-Cox's actual stack (Step Functions/EventBridge DAGs).
+choreography build hit that orchestration structurally couldn't, and where the two map onto a
+real AWS-native stack (Step Functions/EventBridge DAGs).
 
 ## Status
 
