@@ -93,7 +93,7 @@ you'd rather go a different way):
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `LoadFromHistory_ReplayingAFullLifecycle_ReconstructsTheSameStateAsLiveMethodCalls`
 
-- [ ] 12. Projection: available quantity per SKU
+- [x] 12. Projection: available quantity per SKU
       - File(s): `src/Inventory.Domain/InventoryProjection.cs`
       - Test: `tests/Inventory.Domain.Tests/InventoryProjectionTests.cs` —
         `Apply_SeededThenReserved_ReflectsReducedAvailableQuantity`,
