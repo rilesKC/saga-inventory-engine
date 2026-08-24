@@ -84,4 +84,33 @@ public class SagaCoordinatorTests
         Assert.Equal("SKU-1", published.Sku);
         Assert.Equal(SagaStep.Compensating, coordinator.GetStep("ORDER-1"));
     }
+
+    [Fact]
+    public void OnReservationConfirmedReply_PublishesScheduleShipmentCommand()
+    {
+        var bus = new EventBus();
+        var coordinator = new SagaCoordinator(bus);
+        bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
+        ScheduleShipmentCommand? published = null;
+        bus.Subscribe<ScheduleShipmentCommand>(e => published = e);
+
+        bus.Publish(new ReservationConfirmedReply("ORDER-1", "SKU-1"));
+
+        Assert.NotNull(published);
+        Assert.Equal("ORDER-1", published.OrderId);
+        Assert.Equal("SKU-1", published.Sku);
+        Assert.Equal(SagaStep.SchedulingShipment, coordinator.GetStep("ORDER-1"));
+    }
+
+    [Fact]
+    public void OnReservationReleasedReply_MarksSagaCompensated()
+    {
+        var bus = new EventBus();
+        var coordinator = new SagaCoordinator(bus);
+        bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 999.99m));
+
+        bus.Publish(new ReservationReleasedReply("ORDER-1", "SKU-1"));
+
+        Assert.Equal(SagaStep.Compensated, coordinator.GetStep("ORDER-1"));
+    }
 }

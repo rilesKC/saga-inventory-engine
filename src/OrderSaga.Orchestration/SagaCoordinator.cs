@@ -15,6 +15,8 @@ public sealed class SagaCoordinator
         _bus.Subscribe<StockReservationFailedReply>(OnStockReservationFailedReply);
         _bus.Subscribe<PaymentChargedReply>(OnPaymentChargedReply);
         _bus.Subscribe<PaymentDeclinedReply>(OnPaymentDeclinedReply);
+        _bus.Subscribe<ReservationConfirmedReply>(OnReservationConfirmedReply);
+        _bus.Subscribe<ReservationReleasedReply>(OnReservationReleasedReply);
     }
 
     public SagaStep GetStep(string orderId) => _sagas[orderId].Step;
@@ -52,5 +54,18 @@ public sealed class SagaCoordinator
         var saga = _sagas[reply.OrderId];
         _sagas[reply.OrderId] = saga with { Step = SagaStep.Compensating };
         _bus.Publish(new ReleaseReservationCommand(reply.OrderId, reply.Sku));
+    }
+
+    private void OnReservationConfirmedReply(ReservationConfirmedReply reply)
+    {
+        var saga = _sagas[reply.OrderId];
+        _sagas[reply.OrderId] = saga with { Step = SagaStep.SchedulingShipment };
+        _bus.Publish(new ScheduleShipmentCommand(reply.OrderId, reply.Sku));
+    }
+
+    private void OnReservationReleasedReply(ReservationReleasedReply reply)
+    {
+        var saga = _sagas[reply.OrderId];
+        _sagas[reply.OrderId] = saga with { Step = SagaStep.Compensated };
     }
 }

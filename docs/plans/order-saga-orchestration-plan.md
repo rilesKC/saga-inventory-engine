@@ -101,7 +101,7 @@ you'd rather go a different way):
         `OnPaymentChargedReply_PublishesConfirmReservationCommand`,
         `OnPaymentDeclinedReply_PublishesReleaseReservationCommand`
 
-- [ ] 12. Saga coordinator — confirm/release replies
+- [x] 12. Saga coordinator — confirm/release replies
       - File(s): `src/OrderSaga.Orchestration/SagaCoordinator.cs`
       - Test: `tests/OrderSaga.Orchestration.Tests/SagaCoordinatorTests.cs` —
         `OnReservationConfirmedReply_PublishesScheduleShipmentCommand`,
