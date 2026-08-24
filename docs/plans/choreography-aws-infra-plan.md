@@ -38,7 +38,7 @@ you'd rather go a different way):
         added to `InventoryEngine.slnx`
       - Test: `tests/OrderSaga.Choreography.Host.Tests/SmokeTests.cs` — `TestProjectRuns`
 
-- [ ] 2. Message envelope and event-type registry
+- [x] 2. Message envelope and event-type registry
       - File(s): `src/OrderSaga.Choreography.Host/EventEnvelope.cs`,
         `src/OrderSaga.Choreography.Host/EventTypeRegistry.cs`
       - Test: `tests/OrderSaga.Choreography.Host.Tests/EventEnvelopeTests.cs` —
