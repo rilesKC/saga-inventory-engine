@@ -132,7 +132,7 @@ you'd rather go a different way):
       - File(s): `infra/modules/idempotency/dynamodb.tf`
       - Verification: `terraform validate` passes
 
-- [ ] 15. IAM roles, ECR repository, CloudWatch log group
+- [x] 15. IAM roles, ECR repository, CloudWatch log group
       - File(s): `infra/modules/iam-and-observability/*.tf` — ECS task execution role, task role
         (least-privilege: EventBridge `PutEvents`, SQS receive/delete, DynamoDB conditional
         `PutItem`), ECR repository, CloudWatch log group
