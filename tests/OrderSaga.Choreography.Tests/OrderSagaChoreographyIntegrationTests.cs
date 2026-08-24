@@ -29,4 +29,23 @@ public class OrderSagaChoreographyIntegrationTests
         Assert.Equal(4, item.DeductedQuantity);
         Assert.Equal(0, item.ReservedQuantity);
     }
+
+    [Fact]
+    public void OrderPlaced_InsufficientStock_PublishesFailureAndNeverReachesPaymentOrShipping()
+    {
+        var (bus, item) = WireSaga("SKU-1", 10, 500m);
+        StockReservationFailed? failed = null;
+        bus.Subscribe<StockReservationFailed>(e => failed = e);
+        var paymentOrShippingFired = false;
+        bus.Subscribe<PaymentCharged>(_ => paymentOrShippingFired = true);
+        bus.Subscribe<PaymentDeclined>(_ => paymentOrShippingFired = true);
+        bus.Subscribe<ShipmentScheduled>(_ => paymentOrShippingFired = true);
+
+        bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 11, 199.99m));
+
+        Assert.NotNull(failed);
+        Assert.Equal("ORDER-1", failed.OrderId);
+        Assert.False(paymentOrShippingFired);
+        Assert.Equal(10, item.AvailableQuantity);
+    }
 }

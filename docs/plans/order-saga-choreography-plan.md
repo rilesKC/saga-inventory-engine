@@ -92,7 +92,7 @@ you'd rather go a different way):
         the whole time, since each one only ever published a single event per test and never
         exercised a *nested* publish during an in-progress dispatch.
 
-- [ ] 11. Integration: insufficient-stock compensation path
+- [x] 11. Integration: insufficient-stock compensation path
       - File(s): none new
       - Test: `tests/OrderSaga.Choreography.Tests/OrderSagaChoreographyIntegrationTests.cs` —
         `OrderPlaced_InsufficientStock_PublishesFailureAndNeverReachesPaymentOrShipping`
