@@ -85,6 +85,8 @@ _ = app.Services.GetRequiredService<PaymentStub>();
 _ = app.Services.GetRequiredService<ShippingStub>();
 _ = app.Services.GetRequiredService<OutboundEventForwarder>();
 
+app.MapGet("/health", () => Results.Ok());
+
 app.MapPost("/orders", (PlaceOrderRequest request, OrderIntakeHandler handler) =>
 {
     handler.Handle(request);

@@ -138,9 +138,13 @@ you'd rather go a different way):
         `PutItem`), ECR repository, CloudWatch log group
       - Verification: `terraform validate` passes
 
-- [ ] 16. ALB and security groups module
+- [x] 16. ALB and security groups module
       - File(s): `infra/modules/load-balancer/*.tf`
       - Verification: `terraform validate` passes
+      - ⚠ Retro: the ALB target group's health check needs a real endpoint, and `Program.cs`
+        (task 10) didn't have one — added a minimal `GET /health` to `Program.cs` as part of this
+        task rather than pointing the health check at something that doesn't exist. Small, but
+        another instance of infra work surfacing a gap in already-completed app-code wiring.
 
 - [ ] 17. ECS cluster and Fargate service module
       - File(s): `infra/modules/compute/*.tf` — ECS cluster, Fargate task definition (referencing
