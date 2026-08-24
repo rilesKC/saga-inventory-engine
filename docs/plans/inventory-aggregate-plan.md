@@ -27,6 +27,13 @@ you'd rather go a different way):
         `tests/Inventory.Domain.Tests/Inventory.Domain.Tests.csproj`
       - Test: `tests/Inventory.Domain.Tests/SmokeTests.cs` — `TestProjectRuns` (trivial sanity
         assertion confirming the test project builds and executes before any real logic exists)
+      - ⚠ Retro: took several real backtracks (a `UseAppHost=false` attempt rejected by xUnit v3's
+        own build target, then a TargetFramework pivot from net8.0 to net10.0) due to unanticipated
+        environment friction — the net8.0 apphost pack isn't available under the installed .NET 10
+        SDK. A "scaffold the solution" task turned into real troubleshooting rather than a quick
+        2-10 minute step; later tasks shouldn't hit this again since the environment question is
+        now resolved, but worth having future scaffolding-style tasks budget for SDK/tooling
+        surprises rather than assuming they're pure mechanical setup.
 
 - [ ] 2. Define the command and event record types
       - File(s): `src/Inventory.Domain/Commands.cs` (`ReserveStock`, `ConfirmReservation`,
