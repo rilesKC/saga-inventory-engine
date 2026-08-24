@@ -25,7 +25,7 @@ you'd rather go a different way):
         `Inventory.Domain`), added to `InventoryEngine.slnx`
       - Test: `tests/OrderSaga.Choreography.Tests/SmokeTests.cs` — `TestProjectRuns`
 
-- [ ] 2. Event bus: publish/subscribe roundtrip
+- [x] 2. Event bus: publish/subscribe roundtrip
       - File(s): `src/OrderSaga.Choreography/EventBus.cs`
       - Test: `tests/OrderSaga.Choreography.Tests/EventBusTests.cs` —
         `Publish_InvokesSubscribedHandlerWithTheEvent`,
