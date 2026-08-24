@@ -112,10 +112,16 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Orchestration.Tests/SagaCoordinatorTests.cs` —
         `OnShipmentScheduledReply_MarksSagaCompleted`
 
-- [ ] 14. Integration: full happy path
+- [x] 14. Integration: full happy path
       - File(s): none new (wires tasks 3–13 together in the test)
       - Test: `tests/OrderSaga.Orchestration.Tests/OrderSagaOrchestrationIntegrationTests.cs` —
         `OrderPlaced_HappyPath_EndsWithSagaCompletedAndReservationConfirmed`
+      - Note (not a Retro flag — no signal fired, but worth recording): passed first try, unlike
+        choreography's equivalent test. The shared `EventBus`'s breadth-first fix (made during
+        choreography) already protects this, and orchestration's linear command→reply chain never
+        has two different participants both reacting to the same trigger the way choreography's
+        `InventoryParticipant` and `PaymentStub` both reacted to `OrderPlaced` — a real structural
+        difference between the two coordination styles' exposure to that class of bug.
 
 - [ ] 15. Integration: insufficient-stock compensation path
       - File(s): none new
