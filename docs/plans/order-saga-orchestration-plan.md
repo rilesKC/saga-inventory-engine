@@ -72,7 +72,7 @@ you'd rather go a different way):
         `OnChargePaymentCommand_AmountAtOrBelowThreshold_PublishesPaymentChargedReply`,
         `OnChargePaymentCommand_AmountAboveThreshold_PublishesPaymentDeclinedReply`
 
-- [ ] 8. Shipping responder — always succeeds
+- [x] 8. Shipping responder — always succeeds
       - File(s): `src/OrderSaga.Orchestration/ShippingResponder.cs`
       - Test: `tests/OrderSaga.Orchestration.Tests/ShippingResponderTests.cs` —
         `OnScheduleShipmentCommand_PublishesShipmentScheduledReply`
