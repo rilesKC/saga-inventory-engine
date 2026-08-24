@@ -68,7 +68,7 @@ you'd rather go a different way):
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ConfirmReservation_OnReservedHold_EmitsReservationConfirmedAndMovesQuantityToDeducted`
 
-- [ ] 8. Release reservation — happy path
+- [x] 8. Release reservation — happy path
       - File(s): `src/Inventory.Domain/InventoryItem.cs`
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ReleaseReservation_OnReservedHold_EmitsReservationReleasedAndRestoresAvailableQuantity`

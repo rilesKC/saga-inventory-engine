@@ -55,6 +55,13 @@ public sealed class InventoryItem
         _uncommittedEvents.Add(reservationConfirmed);
     }
 
+    public void Handle(ReleaseReservation command)
+    {
+        var reservationReleased = new ReservationReleased(command.Sku, command.OrderId);
+        Apply(reservationReleased);
+        _uncommittedEvents.Add(reservationReleased);
+    }
+
     private void Apply(StockSeeded stockSeeded)
     {
         Sku = stockSeeded.Sku;
@@ -75,6 +82,14 @@ public sealed class InventoryItem
         _reservations[reservationConfirmed.OrderId] = reservation with { State = ReservationState.Confirmed };
         ReservedQuantity -= reservation.Quantity;
         DeductedQuantity += reservation.Quantity;
+        Version++;
+    }
+
+    private void Apply(ReservationReleased reservationReleased)
+    {
+        var reservation = _reservations[reservationReleased.OrderId];
+        _reservations[reservationReleased.OrderId] = reservation with { State = ReservationState.Released };
+        ReservedQuantity -= reservation.Quantity;
         Version++;
     }
 }

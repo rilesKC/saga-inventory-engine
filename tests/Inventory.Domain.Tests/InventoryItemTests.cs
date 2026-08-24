@@ -74,4 +74,19 @@ public class InventoryItemTests
         Assert.Equal("SKU-1", confirmed.Sku);
         Assert.Equal("ORDER-1", confirmed.OrderId);
     }
+
+    [Fact]
+    public void ReleaseReservation_OnReservedHold_EmitsReservationReleasedAndRestoresAvailableQuantity()
+    {
+        var item = InventoryItem.Seed("SKU-1", 10);
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+
+        item.Handle(new ReleaseReservation("SKU-1", "ORDER-1"));
+
+        Assert.Equal(10, item.AvailableQuantity);
+        Assert.Equal(0, item.ReservedQuantity);
+        var released = Assert.IsType<ReservationReleased>(item.UncommittedEvents[^1]);
+        Assert.Equal("SKU-1", released.Sku);
+        Assert.Equal("ORDER-1", released.OrderId);
+    }
 }
