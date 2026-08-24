@@ -77,10 +77,17 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Orchestration.Tests/ShippingResponderTests.cs` —
         `OnScheduleShipmentCommand_PublishesShipmentScheduledReply`
 
-- [ ] 9. Saga coordinator — OrderPlaced entry point
+- [x] 9. Saga coordinator — OrderPlaced entry point
       - File(s): `src/OrderSaga.Orchestration/SagaCoordinator.cs`
       - Test: `tests/OrderSaga.Orchestration.Tests/SagaCoordinatorTests.cs` —
         `OnOrderPlaced_CreatesSagaStateAndPublishesReserveStockCommand`
+      - ⚠ Retro: the spec said the coordinator reacts to "the same trigger as choreography," but
+        `OrderPlaced` was defined inside `OrderSaga.Choreography`, which `OrderSaga.Orchestration`
+        can't reference without breaking the independence the `EventBus` extraction (task 1) was
+        for. Moved `OrderPlaced` into `OrderSaga.Shared` too, same reasoning as task 1 — it's
+        genuinely shared trigger data, not implementation-specific. Both plans should have named
+        `OrderPlaced` explicitly as shared infrastructure when task 1 moved `EventBus`, not just
+        discovered it here.
 
 - [ ] 10. Saga coordinator — reserve replies
       - File(s): `src/OrderSaga.Orchestration/SagaCoordinator.cs`

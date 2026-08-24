@@ -1,6 +1,6 @@
-namespace OrderSaga.Choreography.Tests;
+namespace OrderSaga.Shared.Tests;
 
-public class SagaEventsTests
+public class OrderPlacedTests
 {
     [Fact]
     public void OrderPlaced_RecordsOrderIdSkuQuantityAndAmount()

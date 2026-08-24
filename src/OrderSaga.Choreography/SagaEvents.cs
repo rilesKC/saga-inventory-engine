@@ -1,7 +1,5 @@
 namespace OrderSaga.Choreography;
 
-public sealed record OrderPlaced(string OrderId, string Sku, int Quantity, decimal Amount);
-
 public sealed record StockReservationFailed(string OrderId, string Sku);
 
 public sealed record PaymentCharged(string OrderId, string Sku, decimal Amount);
