@@ -184,9 +184,15 @@ you'd rather go a different way):
 
 ### Bridging app and infra
 
-- [ ] 20. Dockerfile for the Host application
-      - File(s): `src/OrderSaga.Choreography.Host/Dockerfile`
+- [x] 20. Dockerfile for the Host application
+      - File(s): `src/OrderSaga.Choreography.Host/Dockerfile`, `.dockerignore` (new, repo root)
       - Verification: `docker build` succeeds locally
+      - ⚠ Retro: first build attempt failed with a NuGet "fallback package folder" error referencing
+        a Windows-only path. Root cause: `COPY src/.../ src/.../` copied the *host's* Windows-built
+        `bin/`/`obj/` directories into the Linux build container, clobbering the container's own
+        clean restore with Windows-specific paths baked into `project.assets.json`. Fixed with a
+        `.dockerignore` excluding `**/bin/`/`**/obj/` — a real, non-obvious Docker-on-Windows
+        gotcha, not caught by anything in the plan or spec, only by actually running the build.
 
 ### Validation
 
