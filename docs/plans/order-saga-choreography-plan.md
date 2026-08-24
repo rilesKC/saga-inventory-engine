@@ -37,7 +37,7 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Choreography.Tests/SagaEventsTests.cs` —
         `OrderPlaced_RecordsOrderIdSkuQuantityAndAmount`
 
-- [ ] 4. Inventory participant — reserve on OrderPlaced (happy path)
+- [x] 4. Inventory participant — reserve on OrderPlaced (happy path)
       - File(s): `src/OrderSaga.Choreography/InventoryParticipant.cs`
       - Test: `tests/OrderSaga.Choreography.Tests/InventoryParticipantTests.cs` —
         `OnOrderPlaced_WithSufficientStock_PublishesStockReserved`
