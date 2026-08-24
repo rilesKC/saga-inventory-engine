@@ -22,7 +22,7 @@ you'd rather go a different way):
 
 ## Tasks
 
-- [ ] 1. Scaffold the solution and projects
+- [x] 1. Scaffold the solution and projects
       - File(s): `InventoryEngine.sln`, `src/Inventory.Domain/Inventory.Domain.csproj`,
         `tests/Inventory.Domain.Tests/Inventory.Domain.Tests.csproj`
       - Test: `tests/Inventory.Domain.Tests/SmokeTests.cs` — `TestProjectRuns` (trivial sanity
