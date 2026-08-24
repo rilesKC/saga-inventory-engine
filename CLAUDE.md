@@ -9,9 +9,15 @@ saga, built twice, deployed once for real — over broad coverage.
 
 ## Domain
 
-E-commerce order fulfillment saga: **Order → Payment → Inventory → Shipping**. The Inventory
-service is event-sourced (immutable event log + rebuildable projection); it's the piece most
-directly demonstrating "event-driven systems" experience, so it gets the most design attention.
+E-commerce order fulfillment saga: **Order → Inventory → Payment → Shipping**. Inventory reserves
+(a cheap, reversible soft hold) before the harder-to-reverse step of charging money — payment
+succeeding confirms the reservation (permanent deduction), payment failing releases it (the
+compensating action). This ordering is deliberate: it's the one that actually exercises the
+Inventory aggregate's full three-state lifecycle (Reserved/Confirmed/Released), rather than
+collapsing it to a single state because nothing risky is left to fail once Inventory runs. The
+Inventory service is event-sourced (immutable event log + rebuildable projection); it's the piece
+most directly demonstrating "event-driven systems" experience, so it gets the most design
+attention.
 
 The saga is implemented **twice**: once as choreography (services react to each other's events,
 no central coordinator) and once as orchestration (a saga coordinator issues commands and listens

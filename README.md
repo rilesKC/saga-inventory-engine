@@ -6,7 +6,7 @@ S3, DynamoDB, Terraform) on purpose, rather than a generic tutorial stack.
 
 ## What this is
 
-An e-commerce order fulfillment saga — **Order → Payment → Inventory → Shipping** — implemented
+An e-commerce order fulfillment saga — **Order → Inventory → Payment → Shipping** — implemented
 twice: once as choreography, once as orchestration. The Inventory service is event-sourced
 (immutable event log + rebuildable projection).
 
@@ -16,7 +16,9 @@ choreography vs. orchestration).
 
 ## Status
 
-Early scaffold — first spec not yet written.
+Inventory aggregate (event log + projection) complete — see `docs/specs/inventory-aggregate.md`
+and `docs/plans/inventory-aggregate-plan.md`. Saga coordination layer (choreography, then
+orchestration) is next.
 
 ## Development process
 
