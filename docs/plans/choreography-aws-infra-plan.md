@@ -110,7 +110,7 @@ you'd rather go a different way):
 
 ### Terraform (`infra/`)
 
-- [ ] 11. Networking module (VPC, multi-AZ)
+- [x] 11. Networking module (VPC, multi-AZ)
       - File(s): `infra/modules/networking/*.tf` — VPC, public/private subnets across ≥2 AZs, IGW,
         route tables
       - Verification: `terraform validate` (from `infra/`) passes
