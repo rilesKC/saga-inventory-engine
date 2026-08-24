@@ -46,4 +46,16 @@ public class InventoryItemTests
         Assert.Equal(10, item.AvailableQuantity);
         Assert.Single(item.UncommittedEvents);
     }
+
+    [Fact]
+    public void ReserveStock_DuplicateForSameOrderAndSku_ReturnsExistingReservationWithoutReducingAvailableAgain()
+    {
+        var item = InventoryItem.Seed("SKU-1", 10);
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+
+        Assert.Equal(6, item.AvailableQuantity);
+        Assert.Equal(2, item.UncommittedEvents.Count);
+    }
 }

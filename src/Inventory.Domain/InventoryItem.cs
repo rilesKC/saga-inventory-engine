@@ -2,7 +2,10 @@ namespace Inventory.Domain;
 
 public sealed class InventoryItem
 {
+    private enum ReservationState { Reserved, Confirmed, Released }
+
     private readonly List<object> _uncommittedEvents = [];
+    private readonly Dictionary<string, ReservationState> _reservations = [];
 
     public string Sku { get; private set; } = string.Empty;
     public int TotalQuantity { get; private set; }
@@ -27,6 +30,11 @@ public sealed class InventoryItem
 
     public void Handle(ReserveStock command)
     {
+        if (_reservations.ContainsKey(command.OrderId))
+        {
+            return;
+        }
+
         if (command.Quantity > AvailableQuantity)
         {
             throw new InsufficientStockException(command.Sku, command.Quantity, AvailableQuantity);
@@ -46,6 +54,7 @@ public sealed class InventoryItem
 
     private void Apply(StockReserved stockReserved)
     {
+        _reservations[stockReserved.OrderId] = ReservationState.Reserved;
         ReservedQuantity += stockReserved.Quantity;
         Version++;
     }

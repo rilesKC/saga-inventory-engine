@@ -58,7 +58,7 @@ you'd rather go a different way):
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ReserveStock_ExceedingAvailableQuantity_ThrowsInsufficientStockExceptionAndEmitsNoEvent`
 
-- [ ] 6. Reserve stock — idempotent on duplicate request for the same order+SKU
+- [x] 6. Reserve stock — idempotent on duplicate request for the same order+SKU
       - File(s): `src/Inventory.Domain/InventoryItem.cs`
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ReserveStock_DuplicateForSameOrderAndSku_ReturnsExistingReservationWithoutReducingAvailableAgain`
