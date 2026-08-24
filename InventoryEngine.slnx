@@ -2,9 +2,11 @@
   <Folder Name="/src/">
     <Project Path="src/Inventory.Domain/Inventory.Domain.csproj" />
     <Project Path="src/OrderSaga.Choreography/OrderSaga.Choreography.csproj" />
+    <Project Path="src/OrderSaga.Shared/OrderSaga.Shared.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Inventory.Domain.Tests/Inventory.Domain.Tests.csproj" />
     <Project Path="tests/OrderSaga.Choreography.Tests/OrderSaga.Choreography.Tests.csproj" />
+    <Project Path="tests/OrderSaga.Shared.Tests/OrderSaga.Shared.Tests.csproj" />
   </Folder>
 </Solution>

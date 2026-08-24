@@ -1,4 +1,4 @@
-namespace OrderSaga.Choreography;
+namespace OrderSaga.Shared;
 
 public sealed class EventBus
 {

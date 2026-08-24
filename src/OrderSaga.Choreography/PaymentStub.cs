@@ -1,4 +1,5 @@
 using Inventory.Domain;
+using OrderSaga.Shared;
 
 namespace OrderSaga.Choreography;
 

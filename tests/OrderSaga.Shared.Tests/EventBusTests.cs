@@ -1,4 +1,4 @@
-namespace OrderSaga.Choreography.Tests;
+namespace OrderSaga.Shared.Tests;
 
 public class EventBusTests
 {

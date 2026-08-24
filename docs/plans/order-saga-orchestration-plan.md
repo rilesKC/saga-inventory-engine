@@ -18,7 +18,7 @@ you'd rather go a different way):
 
 ## Tasks
 
-- [ ] 1. Extract `EventBus` into a new shared project
+- [x] 1. Extract `EventBus` into a new shared project
       - File(s): `src/OrderSaga.Shared/OrderSaga.Shared.csproj` (new),
         `src/OrderSaga.Shared/EventBus.cs` (moved from `OrderSaga.Choreography`, namespace changed
         to `OrderSaga.Shared`), `tests/OrderSaga.Shared.Tests/OrderSaga.Shared.Tests.csproj` (new),
