@@ -68,15 +68,20 @@ you'd rather go a different way):
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ConfirmReservation_OnReservedHold_EmitsReservationConfirmedAndMovesQuantityToDeducted`
 
-- [ ] 8. Confirm reservation — rejected if already released
-      - File(s): `src/Inventory.Domain/InventoryItem.cs`
-      - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
-        `ConfirmReservation_AlreadyReleased_ThrowsInvalidReservationStateException`
-
-- [ ] 9. Release reservation — happy path
+- [ ] 8. Release reservation — happy path
       - File(s): `src/Inventory.Domain/InventoryItem.cs`
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ReleaseReservation_OnReservedHold_EmitsReservationReleasedAndRestoresAvailableQuantity`
+      - ⚠ Retro: reordered ahead of "confirm rejected if already released" (the plan's original
+        task 8) — that task can't be tested without release functionality existing first to put a
+        reservation into the `Released` state; the original ordering didn't account for that
+        dependency. Caught before implementation started, per the plan's own "reorder if a task
+        can't be made independently buildable" guardrail.
+
+- [ ] 9. Confirm reservation — rejected if already released
+      - File(s): `src/Inventory.Domain/InventoryItem.cs`
+      - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
+        `ConfirmReservation_AlreadyReleased_ThrowsInvalidReservationStateException`
 
 - [ ] 10. Release reservation — rejected if already confirmed
       - File(s): `src/Inventory.Domain/InventoryItem.cs`
