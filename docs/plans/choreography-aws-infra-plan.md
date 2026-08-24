@@ -86,7 +86,7 @@ you'd rather go a different way):
         (already unit-tested in task 5) with the actual receive/delete loop. Real behavior
         verified via LocalStack (task 21).
 
-- [ ] 10. Wire the Host application
+- [x] 10. Wire the Host application
       - File(s): `src/OrderSaga.Choreography.Host/Program.cs` — registers the intake endpoint
         (`POST /orders` → `OrderIntakeHandler`), the background poller, DI for every abstraction
         and its real implementation, `InventoryParticipant`/`PaymentStub`/`ShippingStub` and a
