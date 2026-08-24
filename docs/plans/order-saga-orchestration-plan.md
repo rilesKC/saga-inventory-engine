@@ -40,7 +40,7 @@ you'd rather go a different way):
         `InventoryEngine.slnx`
       - Test: `tests/OrderSaga.Orchestration.Tests/SmokeTests.cs` — `TestProjectRuns`
 
-- [ ] 3. Command and reply types
+- [x] 3. Command and reply types
       - File(s): `src/OrderSaga.Orchestration/Commands.cs` (`ReserveStockCommand`,
         `ConfirmReservationCommand`, `ReleaseReservationCommand`, `ChargePaymentCommand`,
         `ScheduleShipmentCommand`), `src/OrderSaga.Orchestration/Replies.cs`
