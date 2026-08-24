@@ -17,6 +17,7 @@ public sealed class SagaCoordinator
         _bus.Subscribe<PaymentDeclinedReply>(OnPaymentDeclinedReply);
         _bus.Subscribe<ReservationConfirmedReply>(OnReservationConfirmedReply);
         _bus.Subscribe<ReservationReleasedReply>(OnReservationReleasedReply);
+        _bus.Subscribe<ShipmentScheduledReply>(OnShipmentScheduledReply);
     }
 
     public SagaStep GetStep(string orderId) => _sagas[orderId].Step;
@@ -67,5 +68,11 @@ public sealed class SagaCoordinator
     {
         var saga = _sagas[reply.OrderId];
         _sagas[reply.OrderId] = saga with { Step = SagaStep.Compensated };
+    }
+
+    private void OnShipmentScheduledReply(ShipmentScheduledReply reply)
+    {
+        var saga = _sagas[reply.OrderId];
+        _sagas[reply.OrderId] = saga with { Step = SagaStep.Completed };
     }
 }

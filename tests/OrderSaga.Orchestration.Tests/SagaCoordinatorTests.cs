@@ -113,4 +113,16 @@ public class SagaCoordinatorTests
 
         Assert.Equal(SagaStep.Compensated, coordinator.GetStep("ORDER-1"));
     }
+
+    [Fact]
+    public void OnShipmentScheduledReply_MarksSagaCompleted()
+    {
+        var bus = new EventBus();
+        var coordinator = new SagaCoordinator(bus);
+        bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
+
+        bus.Publish(new ShipmentScheduledReply("ORDER-1", "SKU-1"));
+
+        Assert.Equal(SagaStep.Completed, coordinator.GetStep("ORDER-1"));
+    }
 }

@@ -107,7 +107,7 @@ you'd rather go a different way):
         `OnReservationConfirmedReply_PublishesScheduleShipmentCommand`,
         `OnReservationReleasedReply_MarksSagaCompensated`
 
-- [ ] 13. Saga coordinator — shipment reply (terminal, success)
+- [x] 13. Saga coordinator — shipment reply (terminal, success)
       - File(s): `src/OrderSaga.Orchestration/SagaCoordinator.cs`
       - Test: `tests/OrderSaga.Orchestration.Tests/SagaCoordinatorTests.cs` —
         `OnShipmentScheduledReply_MarksSagaCompleted`
