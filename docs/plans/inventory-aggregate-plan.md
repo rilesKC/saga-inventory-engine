@@ -42,7 +42,7 @@ you'd rather go a different way):
       - Test: `tests/Inventory.Domain.Tests/EventsTests.cs` —
         `StockReserved_RecordsSkuOrderIdAndQuantity`
 
-- [ ] 3. Aggregate creation (seed initial stock)
+- [x] 3. Aggregate creation (seed initial stock)
       - File(s): `src/Inventory.Domain/InventoryItem.cs`
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `Seed_SetsAvailableQuantityToInitialQuantity`,
