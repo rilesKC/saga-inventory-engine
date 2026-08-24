@@ -33,7 +33,7 @@ you'd rather go a different way):
         `Publish_NestedPublishDuringDispatch_ProcessesBreadthFirst`. Full solution test suite (all
         30 existing tests) must stay green after the move.
 
-- [ ] 2. Scaffold the orchestration project and test project
+- [x] 2. Scaffold the orchestration project and test project
       - File(s): `src/OrderSaga.Orchestration/OrderSaga.Orchestration.csproj` (references
         `Inventory.Domain` and `OrderSaga.Shared`),
         `tests/OrderSaga.Orchestration.Tests/OrderSaga.Orchestration.Tests.csproj`, added to
