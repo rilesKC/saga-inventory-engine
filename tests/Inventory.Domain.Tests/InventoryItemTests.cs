@@ -89,4 +89,15 @@ public class InventoryItemTests
         Assert.Equal("SKU-1", released.Sku);
         Assert.Equal("ORDER-1", released.OrderId);
     }
+
+    [Fact]
+    public void ConfirmReservation_AlreadyReleased_ThrowsInvalidReservationStateException()
+    {
+        var item = InventoryItem.Seed("SKU-1", 10);
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+        item.Handle(new ReleaseReservation("SKU-1", "ORDER-1"));
+
+        Assert.Throws<InvalidReservationStateException>(() =>
+            item.Handle(new ConfirmReservation("SKU-1", "ORDER-1")));
+    }
 }

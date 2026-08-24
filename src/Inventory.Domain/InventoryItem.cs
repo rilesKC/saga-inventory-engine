@@ -50,6 +50,12 @@ public sealed class InventoryItem
 
     public void Handle(ConfirmReservation command)
     {
+        var reservation = _reservations[command.OrderId];
+        if (reservation.State != ReservationState.Reserved)
+        {
+            throw new InvalidReservationStateException(command.Sku, command.OrderId, nameof(ConfirmReservation));
+        }
+
         var reservationConfirmed = new ReservationConfirmed(command.Sku, command.OrderId);
         Apply(reservationConfirmed);
         _uncommittedEvents.Add(reservationConfirmed);

@@ -78,7 +78,7 @@ you'd rather go a different way):
         dependency. Caught before implementation started, per the plan's own "reorder if a task
         can't be made independently buildable" guardrail.
 
-- [ ] 9. Confirm reservation — rejected if already released
+- [x] 9. Confirm reservation — rejected if already released
       - File(s): `src/Inventory.Domain/InventoryItem.cs`
       - Test: `tests/Inventory.Domain.Tests/InventoryItemTests.cs` —
         `ConfirmReservation_AlreadyReleased_ThrowsInvalidReservationStateException`
