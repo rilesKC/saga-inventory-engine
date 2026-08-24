@@ -88,7 +88,7 @@ public sealed class InventoryItem
             throw new InvalidReservationStateException(command.Sku, command.OrderId, nameof(ConfirmReservation));
         }
 
-        var reservationConfirmed = new ReservationConfirmed(command.Sku, command.OrderId);
+        var reservationConfirmed = new ReservationConfirmed(command.Sku, command.OrderId, reservation.Quantity);
         Apply(reservationConfirmed);
         _uncommittedEvents.Add(reservationConfirmed);
     }
@@ -101,7 +101,7 @@ public sealed class InventoryItem
             throw new InvalidReservationStateException(command.Sku, command.OrderId, nameof(ReleaseReservation));
         }
 
-        var reservationReleased = new ReservationReleased(command.Sku, command.OrderId);
+        var reservationReleased = new ReservationReleased(command.Sku, command.OrderId, reservation.Quantity);
         Apply(reservationReleased);
         _uncommittedEvents.Add(reservationReleased);
     }

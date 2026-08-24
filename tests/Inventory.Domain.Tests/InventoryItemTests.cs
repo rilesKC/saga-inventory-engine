@@ -73,6 +73,7 @@ public class InventoryItemTests
         var confirmed = Assert.IsType<ReservationConfirmed>(item.UncommittedEvents[^1]);
         Assert.Equal("SKU-1", confirmed.Sku);
         Assert.Equal("ORDER-1", confirmed.OrderId);
+        Assert.Equal(4, confirmed.Quantity);
     }
 
     [Fact]
@@ -88,6 +89,7 @@ public class InventoryItemTests
         var released = Assert.IsType<ReservationReleased>(item.UncommittedEvents[^1]);
         Assert.Equal("SKU-1", released.Sku);
         Assert.Equal("ORDER-1", released.OrderId);
+        Assert.Equal(4, released.Quantity);
     }
 
     [Fact]
