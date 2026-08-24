@@ -66,7 +66,7 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Orchestration.Tests/InventoryResponderTests.cs` —
         `OnReleaseReservationCommand_ReleasesReservationAndPublishesReservationReleasedReply`
 
-- [ ] 7. Payment responder — threshold rule
+- [x] 7. Payment responder — threshold rule
       - File(s): `src/OrderSaga.Orchestration/PaymentResponder.cs`
       - Test: `tests/OrderSaga.Orchestration.Tests/PaymentResponderTests.cs` —
         `OnChargePaymentCommand_AmountAtOrBelowThreshold_PublishesPaymentChargedReply`,
