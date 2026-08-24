@@ -115,7 +115,7 @@ you'd rather go a different way):
         route tables
       - Verification: `terraform validate` (from `infra/`) passes
 
-- [ ] 12. SQS queue + DLQ module
+- [x] 12. SQS queue + DLQ module
       - File(s): `infra/modules/messaging/sqs.tf` — the shared queue, its DLQ, and a redrive
         policy (small `maxReceiveCount`)
       - Verification: `terraform validate` passes
