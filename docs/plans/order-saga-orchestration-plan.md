@@ -61,7 +61,7 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Orchestration.Tests/InventoryResponderTests.cs` —
         `OnConfirmReservationCommand_ConfirmsReservationAndPublishesReservationConfirmedReply`
 
-- [ ] 6. Inventory responder — release on ReleaseReservationCommand
+- [x] 6. Inventory responder — release on ReleaseReservationCommand
       - File(s): `src/OrderSaga.Orchestration/InventoryResponder.cs`
       - Test: `tests/OrderSaga.Orchestration.Tests/InventoryResponderTests.cs` —
         `OnReleaseReservationCommand_ReleasesReservationAndPublishesReservationReleasedReply`

@@ -57,4 +57,22 @@ public class InventoryResponderTests
         Assert.Equal(4, item.DeductedQuantity);
         Assert.Equal(0, item.ReservedQuantity);
     }
+
+    [Fact]
+    public void OnReleaseReservationCommand_ReleasesReservationAndPublishesReservationReleasedReply()
+    {
+        var bus = new EventBus();
+        var item = InventoryItem.Seed("SKU-1", 10);
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+        _ = new InventoryResponder(bus, new Dictionary<string, InventoryItem> { ["SKU-1"] = item });
+        ReservationReleasedReply? published = null;
+        bus.Subscribe<ReservationReleasedReply>(e => published = e);
+
+        bus.Publish(new ReleaseReservationCommand("ORDER-1", "SKU-1"));
+
+        Assert.NotNull(published);
+        Assert.Equal("SKU-1", published.Sku);
+        Assert.Equal("ORDER-1", published.OrderId);
+        Assert.Equal(10, item.AvailableQuantity);
+    }
 }

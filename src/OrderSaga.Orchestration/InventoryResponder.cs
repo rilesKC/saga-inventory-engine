@@ -14,6 +14,7 @@ public sealed class InventoryResponder
         _items = items;
         _bus.Subscribe<ReserveStockCommand>(OnReserveStockCommand);
         _bus.Subscribe<ConfirmReservationCommand>(OnConfirmReservationCommand);
+        _bus.Subscribe<ReleaseReservationCommand>(OnReleaseReservationCommand);
     }
 
     private void OnReserveStockCommand(ReserveStockCommand command)
@@ -38,5 +39,12 @@ public sealed class InventoryResponder
         var item = _items[command.Sku];
         item.Handle(new ConfirmReservation(command.Sku, command.OrderId));
         _bus.Publish(new ReservationConfirmedReply(command.OrderId, command.Sku));
+    }
+
+    private void OnReleaseReservationCommand(ReleaseReservationCommand command)
+    {
+        var item = _items[command.Sku];
+        item.Handle(new ReleaseReservation(command.Sku, command.OrderId));
+        _bus.Publish(new ReservationReleasedReply(command.OrderId, command.Sku));
     }
 }
