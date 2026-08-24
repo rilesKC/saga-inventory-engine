@@ -58,7 +58,7 @@ you'd rather go a different way):
       - Test: `tests/OrderSaga.Choreography.Host.Tests/OutboundEventForwarderTests.cs` —
         `Publish_OrderPlaced_ForwardsToEventPublisher` (using a recording fake `IEventPublisher`)
 
-- [ ] 5. SQS message processor (claim-check + dispatch)
+- [x] 5. SQS message processor (claim-check + dispatch)
       - File(s): `src/OrderSaga.Choreography.Host/SqsMessageProcessor.cs`
       - Test: `tests/OrderSaga.Choreography.Host.Tests/SqsMessageProcessorTests.cs` —
         `ProcessMessage_NewEnvelope_ClaimsAndDispatchesToEventBus`,
