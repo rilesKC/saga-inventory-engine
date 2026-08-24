@@ -99,3 +99,12 @@ you'd rather go a different way):
         `Apply_SeededThenReserved_ReflectsReducedAvailableQuantity`,
         `Apply_ReservationReleased_RestoresAvailableQuantity`,
         `Apply_ReservationConfirmed_LeavesAvailableQuantityUnchanged`
+      - ⚠ Retro: starting this task surfaced a real defect in task 2's original event schema —
+        `ReservationConfirmed`/`ReservationReleased` only carried `Sku`+`OrderId`, with `Quantity`
+        available solely via the aggregate's own internal `_reservations` lookup. A projection
+        replaying events independently couldn't reconstruct reserved/deducted amounts at all. Fixed
+        as its own commit (adding `Quantity` to both events, updating the two construction sites in
+        `InventoryItem.cs` and strengthening two already-passing tests from tasks 7/8) before
+        writing the projection itself. Worth having `/plan` explicitly check "does every event carry
+        enough data for an independent consumer to replay it" for future event-sourcing specs,
+        rather than only catching it when a real second consumer (the projection) is built.
