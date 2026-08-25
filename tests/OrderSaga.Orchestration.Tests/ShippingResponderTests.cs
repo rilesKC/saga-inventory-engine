@@ -8,7 +8,7 @@ public class ShippingResponderTests
     public void OnScheduleShipmentCommand_PublishesShipmentScheduledReply()
     {
         var bus = new EventBus();
-        _ = new ShippingResponder(bus);
+        _ = new ShippingResponder(new InboundEventBus(bus), new OutboundEventBus(bus));
         ShipmentScheduledReply? published = null;
         bus.Subscribe<ShipmentScheduledReply>(e => published = e);
 

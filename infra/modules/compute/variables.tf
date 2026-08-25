@@ -16,7 +16,9 @@ variable "app_security_group_id" {
 }
 
 variable "target_group_arn" {
-  type = string
+  description = "ALB target group to register this service against. Omit (leave null) for a service with no HTTP surface -- it then relies on ECS's own task-health signal instead of a target-group health check, and gets no container port mapping or load_balancer block at all."
+  type        = string
+  default     = null
 }
 
 variable "task_execution_role_arn" {
@@ -40,13 +42,13 @@ variable "log_group_name" {
   type = string
 }
 
-variable "queue_url" {
-  type = string
-}
-
-variable "event_bus_name" {
-  description = "Passed to the container as EventBridge__BusName -- EventBridgeEventPublisher reads it from configuration instead of hardcoding it, so it can never drift from the bus this module's caller actually created."
-  type        = string
+variable "environment_variables" {
+  description = "App-specific container environment variables (queue URLs, table names, bus names, etc.), supplied by the caller. Deliberately generic -- this module is shared by services with completely different configuration shapes, not just choreography's Sqs__QueueUrl/EventBridge__BusName pair, so it can't hardcode any one service's variable names."
+  type = list(object({
+    name  = string
+    value = string
+  }))
+  default = []
 }
 
 variable "app_port" {

@@ -24,10 +24,12 @@ module "idempotency" {
 module "iam_and_observability" {
   source = "./modules/iam-and-observability"
 
-  name                  = var.name
-  event_bus_arn         = module.messaging.event_bus_arn
-  queue_arn             = module.messaging.queue_arn
-  idempotency_table_arn = module.idempotency.table_arn
+  name = var.name
+  task_policy_statements = [
+    { actions = ["events:PutEvents"], resources = [module.messaging.event_bus_arn] },
+    { actions = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], resources = [module.messaging.queue_arn] },
+    { actions = ["dynamodb:PutItem"], resources = [module.idempotency.table_arn] },
+  ]
 }
 
 module "load_balancer" {
@@ -51,8 +53,10 @@ module "compute" {
   ecr_repository_url      = module.iam_and_observability.ecr_repository_url
   image_tag               = var.image_tag
   log_group_name          = module.iam_and_observability.log_group_name
-  queue_url               = module.messaging.queue_url
-  event_bus_name          = module.messaging.event_bus_name
+  environment_variables = [
+    { name = "Sqs__QueueUrl", value = module.messaging.queue_url },
+    { name = "EventBridge__BusName", value = module.messaging.event_bus_name },
+  ]
 
   # Real resource/module reference, unlike the string-ARN attempt task 17's retro flagged --
   # ensures the ALB listener exists before the ECS service tries to register against it.

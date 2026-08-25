@@ -4,6 +4,10 @@
     <Project Path="src/OrderSaga.Choreography.Host/OrderSaga.Choreography.Host.csproj" />
     <Project Path="src/OrderSaga.Choreography/OrderSaga.Choreography.csproj" />
     <Project Path="src/OrderSaga.Orchestration/OrderSaga.Orchestration.csproj" />
+    <Project Path="src/OrderSaga.Orchestration.CoordinatorHost/OrderSaga.Orchestration.CoordinatorHost.csproj" />
+    <Project Path="src/OrderSaga.Orchestration.InventoryHost/OrderSaga.Orchestration.InventoryHost.csproj" />
+    <Project Path="src/OrderSaga.Orchestration.Messaging/OrderSaga.Orchestration.Messaging.csproj" />
+    <Project Path="src/OrderSaga.Orchestration.ResponderHost/OrderSaga.Orchestration.ResponderHost.csproj" />
     <Project Path="src/OrderSaga.Shared/OrderSaga.Shared.csproj" />
   </Folder>
   <Folder Name="/tests/">
@@ -11,6 +15,10 @@
     <Project Path="tests/OrderSaga.Choreography.Host.Tests/OrderSaga.Choreography.Host.Tests.csproj" />
     <Project Path="tests/OrderSaga.Choreography.Tests/OrderSaga.Choreography.Tests.csproj" />
     <Project Path="tests/OrderSaga.Orchestration.Tests/OrderSaga.Orchestration.Tests.csproj" />
+    <Project Path="tests/OrderSaga.Orchestration.CoordinatorHost.Tests/OrderSaga.Orchestration.CoordinatorHost.Tests.csproj" />
+    <Project Path="tests/OrderSaga.Orchestration.InventoryHost.Tests/OrderSaga.Orchestration.InventoryHost.Tests.csproj" />
+    <Project Path="tests/OrderSaga.Orchestration.ResponderHost.Tests/OrderSaga.Orchestration.ResponderHost.Tests.csproj" />
+    <Project Path="tests/OrderSaga.Orchestration.Messaging.Tests/OrderSaga.Orchestration.Messaging.Tests.csproj" />
     <Project Path="tests/OrderSaga.Shared.Tests/OrderSaga.Shared.Tests.csproj" />
   </Folder>
 </Solution>

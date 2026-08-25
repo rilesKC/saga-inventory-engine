@@ -22,34 +22,24 @@ resource "aws_iam_role_policy_attachment" "task_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Least-privilege application permissions: EventBridge PutEvents on the one bus, SQS
-# receive/delete on the one queue, DynamoDB PutItem on the one idempotency table -- nothing else.
+# Least-privilege application permissions, supplied by the caller as a generic list of statements
+# -- not hardcoded to EventBridge+one-queue+one-table, since orchestration's three services each
+# need a different combination of SQS send/receive/delete and DynamoDB permissions, and none of
+# them need EventBridge at all.
 resource "aws_iam_role" "task" {
   name               = "${var.name}-task"
   assume_role_policy = data.aws_iam_policy_document.ecs_assume_role.json
 }
 
 data "aws_iam_policy_document" "task_permissions" {
-  statement {
-    effect    = "Allow"
-    actions   = ["events:PutEvents"]
-    resources = [var.event_bus_arn]
-  }
+  dynamic "statement" {
+    for_each = var.task_policy_statements
 
-  statement {
-    effect = "Allow"
-    actions = [
-      "sqs:ReceiveMessage",
-      "sqs:DeleteMessage",
-      "sqs:GetQueueAttributes",
-    ]
-    resources = [var.queue_arn]
-  }
-
-  statement {
-    effect    = "Allow"
-    actions   = ["dynamodb:PutItem"]
-    resources = [var.idempotency_table_arn]
+    content {
+      effect    = "Allow"
+      actions   = statement.value.actions
+      resources = statement.value.resources
+    }
   }
 }
 
