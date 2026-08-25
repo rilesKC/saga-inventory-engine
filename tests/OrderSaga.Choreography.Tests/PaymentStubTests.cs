@@ -9,7 +9,7 @@ public class PaymentStubTests
     public void OnStockReserved_AmountAtOrBelowThreshold_PublishesPaymentCharged()
     {
         var bus = new EventBus();
-        _ = new PaymentStub(bus, 500m);
+        _ = new PaymentStub(new InboundEventBus(bus), new OutboundEventBus(bus), 500m);
         PaymentCharged? published = null;
         bus.Subscribe<PaymentCharged>(e => published = e);
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
@@ -26,7 +26,7 @@ public class PaymentStubTests
     public void OnStockReserved_AmountAboveThreshold_PublishesPaymentDeclined()
     {
         var bus = new EventBus();
-        _ = new PaymentStub(bus, 500m);
+        _ = new PaymentStub(new InboundEventBus(bus), new OutboundEventBus(bus), 500m);
         PaymentDeclined? published = null;
         bus.Subscribe<PaymentDeclined>(e => published = e);
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 999.99m));

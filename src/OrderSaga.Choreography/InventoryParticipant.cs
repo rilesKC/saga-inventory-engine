@@ -5,16 +5,28 @@ namespace OrderSaga.Choreography;
 
 public sealed class InventoryParticipant
 {
-    private readonly EventBus _bus;
+    private readonly InboundEventBus _inbound;
+    private readonly OutboundEventBus _outbound;
     private readonly Dictionary<string, InventoryItem> _items;
 
-    public InventoryParticipant(EventBus bus, Dictionary<string, InventoryItem> items)
+    /// <param name="inbound">Subscribed to for trigger events.</param>
+    /// <param name="outbound">Published to for produced events. In-process choreography (this
+    /// project's own tests) wraps the same underlying EventBus for both -- direct
+    /// participant-to-participant reaction is exactly what's being tested there. The Host layer
+    /// (saga-inventory-engine's AWS deployment) wraps two separate EventBus instances so a
+    /// participant's output only reaches the EventBridge-forwarding layer, not sibling participants
+    /// directly -- every cross-participant reaction there is meant to happen via the real SQS
+    /// round-trip, not an in-process shortcut. InboundEventBus/OutboundEventBus being distinct
+    /// types (rather than both just EventBus) means the compiler catches the two parameters being
+    /// swapped -- an unbounded republish loop was caused by exactly that shape of bug once already.</param>
+    public InventoryParticipant(InboundEventBus inbound, OutboundEventBus outbound, Dictionary<string, InventoryItem> items)
     {
-        _bus = bus;
+        _inbound = inbound;
+        _outbound = outbound;
         _items = items;
-        _bus.Subscribe<OrderPlaced>(OnOrderPlaced);
-        _bus.Subscribe<PaymentCharged>(OnPaymentCharged);
-        _bus.Subscribe<PaymentDeclined>(OnPaymentDeclined);
+        _inbound.Subscribe<OrderPlaced>(OnOrderPlaced);
+        _inbound.Subscribe<PaymentCharged>(OnPaymentCharged);
+        _inbound.Subscribe<PaymentDeclined>(OnPaymentDeclined);
     }
 
     private void OnOrderPlaced(OrderPlaced orderPlaced)
@@ -28,7 +40,7 @@ public sealed class InventoryParticipant
         }
         catch (InsufficientStockException)
         {
-            _bus.Publish(new StockReservationFailed(orderPlaced.OrderId, orderPlaced.Sku));
+            _outbound.Publish(new StockReservationFailed(orderPlaced.OrderId, orderPlaced.Sku));
             return;
         }
 
@@ -59,7 +71,7 @@ public sealed class InventoryParticipant
     {
         for (var i = eventCountBefore; i < item.UncommittedEvents.Count; i++)
         {
-            _bus.Publish(item.UncommittedEvents[i]);
+            _outbound.Publish(item.UncommittedEvents[i]);
         }
     }
 }

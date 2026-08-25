@@ -6,7 +6,8 @@ obj/
 
 # Terraform
 .terraform/
-.terraform.lock.hcl
+# .terraform.lock.hcl is intentionally NOT ignored -- it locks provider versions for reproducible
+# `terraform init` across environments (local, LocalStack, CI) and should be committed.
 *.tfstate
 *.tfstate.*
 *.tfvars

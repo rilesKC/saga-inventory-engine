@@ -1,0 +1,10 @@
+# Host-built artifacts must never be copied into the Linux build container -- they carry
+# Windows-specific paths (NuGet fallback folders, etc.) that break the container's own restore.
+**/bin/
+**/obj/
+
+.git/
+.vs/
+infra/.terraform/
+*.tfstate
+*.tfstate.*

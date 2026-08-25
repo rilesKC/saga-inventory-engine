@@ -5,16 +5,21 @@ namespace OrderSaga.Choreography;
 
 public sealed class PaymentStub
 {
-    private readonly EventBus _bus;
+    private readonly InboundEventBus _inbound;
+    private readonly OutboundEventBus _outbound;
     private readonly decimal _threshold;
     private readonly Dictionary<string, decimal> _amountsByOrderId = [];
 
-    public PaymentStub(EventBus bus, decimal threshold)
+    /// <param name="inbound">Subscribed to for trigger events.</param>
+    /// <param name="outbound">Published to for produced events. See
+    /// <see cref="InventoryParticipant"/>'s constructor for why these are separate.</param>
+    public PaymentStub(InboundEventBus inbound, OutboundEventBus outbound, decimal threshold)
     {
-        _bus = bus;
+        _inbound = inbound;
+        _outbound = outbound;
         _threshold = threshold;
-        _bus.Subscribe<OrderPlaced>(OnOrderPlaced);
-        _bus.Subscribe<StockReserved>(OnStockReserved);
+        _inbound.Subscribe<OrderPlaced>(OnOrderPlaced);
+        _inbound.Subscribe<StockReserved>(OnStockReserved);
     }
 
     private void OnOrderPlaced(OrderPlaced orderPlaced)
@@ -28,11 +33,11 @@ public sealed class PaymentStub
 
         if (amount > _threshold)
         {
-            _bus.Publish(new PaymentDeclined(stockReserved.OrderId, stockReserved.Sku, amount));
+            _outbound.Publish(new PaymentDeclined(stockReserved.OrderId, stockReserved.Sku, amount));
         }
         else
         {
-            _bus.Publish(new PaymentCharged(stockReserved.OrderId, stockReserved.Sku, amount));
+            _outbound.Publish(new PaymentCharged(stockReserved.OrderId, stockReserved.Sku, amount));
         }
     }
 }

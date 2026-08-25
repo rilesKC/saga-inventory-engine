@@ -9,7 +9,7 @@ public class ShippingStubTests
     public void OnReservationConfirmed_PublishesShipmentScheduled()
     {
         var bus = new EventBus();
-        _ = new ShippingStub(bus);
+        _ = new ShippingStub(new InboundEventBus(bus), new OutboundEventBus(bus));
         ShipmentScheduled? published = null;
         bus.Subscribe<ShipmentScheduled>(e => published = e);
 
