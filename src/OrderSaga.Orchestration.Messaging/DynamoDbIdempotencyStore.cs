@@ -1,5 +1,6 @@
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
+using OrderSaga.Aws;
 
 namespace OrderSaga.Orchestration.Messaging;
 

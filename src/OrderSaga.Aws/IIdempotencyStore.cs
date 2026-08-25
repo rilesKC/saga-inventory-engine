@@ -1,4 +1,4 @@
-namespace OrderSaga.Orchestration.Messaging;
+namespace OrderSaga.Aws;
 
 public interface IIdempotencyStore
 {

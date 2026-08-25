@@ -1,6 +1,7 @@
 using Amazon.DynamoDBv2;
 using Amazon.SQS;
 using Microsoft.Extensions.Hosting;
+using OrderSaga.Aws;
 using OrderSaga.Orchestration.Messaging;
 using OrderSaga.Orchestration.ResponderHost;
 using OrderSaga.Shared;
@@ -39,13 +40,15 @@ builder.Services.AddHostedService(sp => new SqsPollingBackgroundService(
     statelessResponderCommandsQueueUrl,
     sp.GetRequiredService<ILogger<SqsPollingBackgroundService>>()));
 
+builder.Services.AddSingleton<IMessagePublisher>(sp =>
+    new SqsMessagePublisher(sp.GetRequiredService<IAmazonSQS>(), coordinatorInboundQueueUrl, sp.GetRequiredService<IHostApplicationLifetime>()));
+builder.Services.AddSingleton(sp => new OutboundMessageForwarder(outboundBus, _ => sp.GetRequiredService<IMessagePublisher>()));
+
 var host = builder.Build();
 
-// The outbound forwarder is constructed here (after the container exists) since it needs
-// IHostApplicationLifetime for the publisher it wraps -- same reasoning as CoordinatorHost.
-var sqsClient = host.Services.GetRequiredService<IAmazonSQS>();
-var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
-var coordinatorInboundPublisher = new SqsMessagePublisher(sqsClient, coordinatorInboundQueueUrl, lifetime);
-_ = new OutboundMessageForwarder(outboundBus, _ => coordinatorInboundPublisher);
+// Eagerly resolve the forwarder so its EventBus subscription is wired up before any responder
+// reply arrives -- it's never otherwise resolved from the container, since nothing calls its
+// methods directly. Same precedent as choreography's OutboundEventForwarder.
+_ = host.Services.GetRequiredService<OutboundMessageForwarder>();
 
 host.Run();

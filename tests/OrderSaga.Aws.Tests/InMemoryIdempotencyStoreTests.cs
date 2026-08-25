@@ -1,4 +1,4 @@
-namespace OrderSaga.Orchestration.Messaging.Tests;
+namespace OrderSaga.Aws.Tests;
 
 public class InMemoryIdempotencyStoreTests
 {

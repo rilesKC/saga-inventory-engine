@@ -1,10 +1,10 @@
 using System.Collections.Concurrent;
 
-namespace OrderSaga.Orchestration.Messaging;
+namespace OrderSaga.Aws;
 
 /// <summary>
 /// Test double only -- doesn't survive process restart or share state across instances.
-/// Production uses <see cref="DynamoDbIdempotencyStore"/>.
+/// Production uses a real, durable implementation (e.g. a DynamoDB-backed one).
 /// </summary>
 public sealed class InMemoryIdempotencyStore : IIdempotencyStore
 {

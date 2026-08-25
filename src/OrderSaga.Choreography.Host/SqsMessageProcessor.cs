@@ -1,4 +1,5 @@
 using System.Text.Json;
+using OrderSaga.Aws;
 using OrderSaga.Shared;
 
 namespace OrderSaga.Choreography.Host;
@@ -6,9 +7,10 @@ namespace OrderSaga.Choreography.Host;
 /// <summary>
 /// The real per-message logic (deserialize, claim-check, dispatch), decoupled from the actual SQS
 /// receive/delete loop so it's independently unit-testable. The thin AWS SDK plumbing that calls
-/// this lives in <see cref="SqsPollingBackgroundService"/> and is verified via LocalStack instead.
+/// this (<see cref="OrderSaga.Aws.SqsPollingBackgroundService"/>, shared with orchestration) is
+/// verified via LocalStack instead.
 /// </summary>
-public sealed class SqsMessageProcessor
+public sealed class SqsMessageProcessor : IMessageProcessor
 {
     private readonly EventBus _bus;
     private readonly IIdempotencyStore _idempotencyStore;

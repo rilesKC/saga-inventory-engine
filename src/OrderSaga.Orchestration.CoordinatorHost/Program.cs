@@ -1,5 +1,6 @@
 using Amazon.DynamoDBv2;
 using Amazon.SQS;
+using OrderSaga.Aws;
 using OrderSaga.Orchestration.CoordinatorHost;
 using OrderSaga.Orchestration.Messaging;
 using OrderSaga.Shared;
@@ -42,28 +43,35 @@ builder.Services.AddHostedService(sp => new SqsPollingBackgroundService(
     coordinatorInboundQueueUrl,
     sp.GetRequiredService<ILogger<SqsPollingBackgroundService>>()));
 
+// Keyed singletons -- .NET's type-based DI can't disambiguate three same-typed IMessagePublisher
+// instances, one per destination queue, but a service key can.
+builder.Services.AddKeyedSingleton<IMessagePublisher>("inventory-commands", (sp, _) =>
+    new SqsMessagePublisher(sp.GetRequiredService<IAmazonSQS>(), inventoryCommandsQueueUrl, sp.GetRequiredService<IHostApplicationLifetime>()));
+builder.Services.AddKeyedSingleton<IMessagePublisher>("stateless-responder-commands", (sp, _) =>
+    new SqsMessagePublisher(sp.GetRequiredService<IAmazonSQS>(), statelessResponderCommandsQueueUrl, sp.GetRequiredService<IHostApplicationLifetime>()));
+builder.Services.AddKeyedSingleton<IMessagePublisher>("coordinator-inbound", (sp, _) =>
+    new SqsMessagePublisher(sp.GetRequiredService<IAmazonSQS>(), coordinatorInboundQueueUrl, sp.GetRequiredService<IHostApplicationLifetime>()));
+
+builder.Services.AddSingleton(sp => new CommandRouter(
+    sp.GetRequiredKeyedService<IMessagePublisher>("inventory-commands"),
+    sp.GetRequiredKeyedService<IMessagePublisher>("stateless-responder-commands")));
+
+builder.Services.AddSingleton(sp => new OutboundMessageForwarder(outboundBus, sp.GetRequiredService<CommandRouter>().PublisherFor));
+
+builder.Services.AddSingleton(sp => new OrderIntakeHandler(sp.GetRequiredKeyedService<IMessagePublisher>("coordinator-inbound")));
+
 var app = builder.Build();
 
-// The publishers below, and everything built from them, are constructed here (after the container
-// exists) rather than registered as DI services -- there's no clean way to express "three distinct
-// IMessagePublisher instances, one per destination queue" through type-based DI resolution.
-var sqsClient = app.Services.GetRequiredService<IAmazonSQS>();
-var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
-
-var inventoryCommandsPublisher = new SqsMessagePublisher(sqsClient, inventoryCommandsQueueUrl, lifetime);
-var statelessResponderCommandsPublisher = new SqsMessagePublisher(sqsClient, statelessResponderCommandsQueueUrl, lifetime);
-var coordinatorInboundPublisher = new SqsMessagePublisher(sqsClient, coordinatorInboundQueueUrl, lifetime);
-
-var commandRouter = new CommandRouter(inventoryCommandsPublisher, statelessResponderCommandsPublisher);
-_ = new OutboundMessageForwarder(outboundBus, commandRouter.PublisherFor);
-
-var orderIntakeHandler = new OrderIntakeHandler(coordinatorInboundPublisher);
+// Eagerly resolve the forwarder so its EventBus subscription is wired up before any command reply
+// arrives -- it's never otherwise resolved from the container, since nothing calls its methods
+// directly. Same precedent as choreography's OutboundEventForwarder.
+_ = app.Services.GetRequiredService<OutboundMessageForwarder>();
 
 app.MapGet("/health", () => Results.Ok());
 
-app.MapPost("/orders", (PlaceOrderRequest request) =>
+app.MapPost("/orders", (PlaceOrderRequest request, OrderIntakeHandler handler) =>
 {
-    orderIntakeHandler.Handle(request);
+    handler.Handle(request);
     return Results.Accepted();
 });
 

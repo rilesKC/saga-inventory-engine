@@ -56,6 +56,12 @@ variable "app_port" {
   default = 8080
 }
 
+variable "desired_count" {
+  description = "Fargate task count. Defaults to 1 -- safe for any caller, since most services here hold in-memory state that isn't shareable across instances yet. Override only for a service confirmed to be genuinely stateless."
+  type        = number
+  default     = 1
+}
+
 variable "cpu" {
   description = "Fargate task CPU units."
   type        = number

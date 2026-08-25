@@ -2,6 +2,7 @@ using Amazon.DynamoDBv2;
 using Amazon.EventBridge;
 using Amazon.SQS;
 using Inventory.Domain;
+using OrderSaga.Aws;
 using OrderSaga.Choreography;
 using OrderSaga.Choreography.Host;
 using OrderSaga.Shared;

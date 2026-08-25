@@ -48,131 +48,124 @@ resource "aws_security_group" "background_worker" {
   }
 }
 
-module "coordinator_iam_and_observability" {
-  source = "../modules/iam-and-observability"
-
-  name = "${var.name}-coordinator"
-  task_policy_statements = [
-    {
-      # Includes coordinator-inbound itself -- OrderIntakeHandler publishes the initial
-      # OrderPlaced trigger onto that same queue it also polls, not just the two command queues.
-      actions = ["sqs:SendMessage"]
-      resources = [
-        module.orchestration_messaging.inventory_commands_queue_arn,
-        module.orchestration_messaging.stateless_responder_commands_queue_arn,
-        module.orchestration_messaging.coordinator_inbound_queue_arn,
+# Per-service config for the IAM and compute modules below -- least-privilege policy statements and
+# container environment variables differ per service, but the module shape (source, variable names)
+# is identical, so a for_each over this map replaces what was three near-identical copies of each
+# module block.
+locals {
+  services = {
+    coordinator = {
+      task_policy_statements = [
+        {
+          # Includes coordinator-inbound itself -- OrderIntakeHandler publishes the initial
+          # OrderPlaced trigger onto that same queue it also polls, not just the two command queues.
+          actions = ["sqs:SendMessage"]
+          resources = [
+            module.orchestration_messaging.inventory_commands_queue_arn,
+            module.orchestration_messaging.stateless_responder_commands_queue_arn,
+            module.orchestration_messaging.coordinator_inbound_queue_arn,
+          ]
+        },
+        {
+          actions   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
+          resources = [module.orchestration_messaging.coordinator_inbound_queue_arn]
+        },
+        {
+          actions   = ["dynamodb:PutItem", "dynamodb:DeleteItem"]
+          resources = [module.idempotency.table_arn]
+        },
       ]
-    },
-    {
-      actions   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
-      resources = [module.orchestration_messaging.coordinator_inbound_queue_arn]
-    },
-    {
-      actions   = ["dynamodb:PutItem", "dynamodb:DeleteItem"]
-      resources = [module.idempotency.table_arn]
-    },
-  ]
+      app_security_group_id = module.load_balancer.app_security_group_id
+      target_group_arn      = module.load_balancer.target_group_arn
+      desired_count         = null
+      environment_variables = [
+        { name = "Sqs__InventoryCommandsQueueUrl", value = module.orchestration_messaging.inventory_commands_queue_url },
+        { name = "Sqs__StatelessResponderCommandsQueueUrl", value = module.orchestration_messaging.stateless_responder_commands_queue_url },
+        { name = "Sqs__CoordinatorInboundQueueUrl", value = module.orchestration_messaging.coordinator_inbound_queue_url },
+        { name = "Dynamo__IdempotencyTableName", value = module.idempotency.table_name },
+      ]
+    }
+    inventory = {
+      task_policy_statements = [
+        {
+          actions   = ["sqs:SendMessage"]
+          resources = [module.orchestration_messaging.coordinator_inbound_queue_arn]
+        },
+        {
+          actions   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
+          resources = [module.orchestration_messaging.inventory_commands_queue_arn]
+        },
+        {
+          actions   = ["dynamodb:PutItem", "dynamodb:DeleteItem"]
+          resources = [module.idempotency.table_arn]
+        },
+      ]
+      app_security_group_id = aws_security_group.background_worker.id
+      target_group_arn      = null
+      desired_count         = null
+      environment_variables = [
+        { name = "Sqs__CoordinatorInboundQueueUrl", value = module.orchestration_messaging.coordinator_inbound_queue_url },
+        { name = "Sqs__InventoryCommandsQueueUrl", value = module.orchestration_messaging.inventory_commands_queue_url },
+        { name = "Dynamo__IdempotencyTableName", value = module.idempotency.table_name },
+      ]
+    }
+    responder = {
+      task_policy_statements = [
+        {
+          actions   = ["sqs:SendMessage"]
+          resources = [module.orchestration_messaging.coordinator_inbound_queue_arn]
+        },
+        {
+          actions   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
+          resources = [module.orchestration_messaging.stateless_responder_commands_queue_arn]
+        },
+        {
+          actions   = ["dynamodb:PutItem", "dynamodb:DeleteItem"]
+          resources = [module.idempotency.table_arn]
+        },
+      ]
+      app_security_group_id = aws_security_group.background_worker.id
+      target_group_arn      = null
+      # The one service in this deployment genuinely safe to run multi-instance today: neither
+      # PaymentResponder nor ShippingResponder holds any cross-order state, unlike the Coordinator's
+      # SagaState or the Inventory responder's InventoryItem. See docs/specs/orchestration-aws-infra.md.
+      desired_count = 2
+      environment_variables = [
+        { name = "Sqs__CoordinatorInboundQueueUrl", value = module.orchestration_messaging.coordinator_inbound_queue_url },
+        { name = "Sqs__StatelessResponderCommandsQueueUrl", value = module.orchestration_messaging.stateless_responder_commands_queue_url },
+        { name = "Dynamo__IdempotencyTableName", value = module.idempotency.table_name },
+      ]
+    }
+  }
 }
 
-module "inventory_iam_and_observability" {
-  source = "../modules/iam-and-observability"
+module "iam_and_observability" {
+  source   = "../modules/iam-and-observability"
+  for_each = local.services
 
-  name = "${var.name}-inventory"
-  task_policy_statements = [
-    {
-      actions   = ["sqs:SendMessage"]
-      resources = [module.orchestration_messaging.coordinator_inbound_queue_arn]
-    },
-    {
-      actions   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
-      resources = [module.orchestration_messaging.inventory_commands_queue_arn]
-    },
-    {
-      actions   = ["dynamodb:PutItem", "dynamodb:DeleteItem"]
-      resources = [module.idempotency.table_arn]
-    },
-  ]
+  name                   = "${var.name}-${each.key}"
+  task_policy_statements = each.value.task_policy_statements
 }
 
-module "responder_iam_and_observability" {
-  source = "../modules/iam-and-observability"
+module "compute" {
+  source   = "../modules/compute"
+  for_each = local.services
 
-  name = "${var.name}-responder"
-  task_policy_statements = [
-    {
-      actions   = ["sqs:SendMessage"]
-      resources = [module.orchestration_messaging.coordinator_inbound_queue_arn]
-    },
-    {
-      actions   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
-      resources = [module.orchestration_messaging.stateless_responder_commands_queue_arn]
-    },
-    {
-      actions   = ["dynamodb:PutItem", "dynamodb:DeleteItem"]
-      resources = [module.idempotency.table_arn]
-    },
-  ]
-}
-
-module "coordinator_compute" {
-  source = "../modules/compute"
-
-  name                    = "${var.name}-coordinator"
+  name                    = "${var.name}-${each.key}"
   aws_region              = var.aws_region
   private_subnet_ids      = module.networking.private_subnet_ids
-  app_security_group_id   = module.load_balancer.app_security_group_id
-  target_group_arn        = module.load_balancer.target_group_arn
-  task_execution_role_arn = module.coordinator_iam_and_observability.task_execution_role_arn
-  task_role_arn           = module.coordinator_iam_and_observability.task_role_arn
-  ecr_repository_url      = module.coordinator_iam_and_observability.ecr_repository_url
+  app_security_group_id   = each.value.app_security_group_id
+  target_group_arn        = each.value.target_group_arn
+  task_execution_role_arn = module.iam_and_observability[each.key].task_execution_role_arn
+  task_role_arn           = module.iam_and_observability[each.key].task_role_arn
+  ecr_repository_url      = module.iam_and_observability[each.key].ecr_repository_url
   image_tag               = var.image_tag
-  log_group_name          = module.coordinator_iam_and_observability.log_group_name
-  environment_variables = [
-    { name = "Sqs__InventoryCommandsQueueUrl", value = module.orchestration_messaging.inventory_commands_queue_url },
-    { name = "Sqs__StatelessResponderCommandsQueueUrl", value = module.orchestration_messaging.stateless_responder_commands_queue_url },
-    { name = "Sqs__CoordinatorInboundQueueUrl", value = module.orchestration_messaging.coordinator_inbound_queue_url },
-    { name = "Dynamo__IdempotencyTableName", value = module.idempotency.table_name },
-  ]
+  log_group_name          = module.iam_and_observability[each.key].log_group_name
+  environment_variables   = each.value.environment_variables
+  desired_count           = coalesce(each.value.desired_count, 1)
 
   # Real resource/module reference, matching choreography's pattern -- ensures the ALB listener
-  # exists before the ECS service tries to register against it.
+  # exists before the ECS service tries to register against it. Harmless for inventory/responder,
+  # which don't attach to the ALB at all.
   depends_on = [module.load_balancer]
-}
-
-module "inventory_compute" {
-  source = "../modules/compute"
-
-  name                    = "${var.name}-inventory"
-  aws_region              = var.aws_region
-  private_subnet_ids      = module.networking.private_subnet_ids
-  app_security_group_id   = aws_security_group.background_worker.id
-  task_execution_role_arn = module.inventory_iam_and_observability.task_execution_role_arn
-  task_role_arn           = module.inventory_iam_and_observability.task_role_arn
-  ecr_repository_url      = module.inventory_iam_and_observability.ecr_repository_url
-  image_tag               = var.image_tag
-  log_group_name          = module.inventory_iam_and_observability.log_group_name
-  environment_variables = [
-    { name = "Sqs__CoordinatorInboundQueueUrl", value = module.orchestration_messaging.coordinator_inbound_queue_url },
-    { name = "Sqs__InventoryCommandsQueueUrl", value = module.orchestration_messaging.inventory_commands_queue_url },
-    { name = "Dynamo__IdempotencyTableName", value = module.idempotency.table_name },
-  ]
-}
-
-module "responder_compute" {
-  source = "../modules/compute"
-
-  name                    = "${var.name}-responder"
-  aws_region              = var.aws_region
-  private_subnet_ids      = module.networking.private_subnet_ids
-  app_security_group_id   = aws_security_group.background_worker.id
-  task_execution_role_arn = module.responder_iam_and_observability.task_execution_role_arn
-  task_role_arn           = module.responder_iam_and_observability.task_role_arn
-  ecr_repository_url      = module.responder_iam_and_observability.ecr_repository_url
-  image_tag               = var.image_tag
-  log_group_name          = module.responder_iam_and_observability.log_group_name
-  environment_variables = [
-    { name = "Sqs__CoordinatorInboundQueueUrl", value = module.orchestration_messaging.coordinator_inbound_queue_url },
-    { name = "Sqs__StatelessResponderCommandsQueueUrl", value = module.orchestration_messaging.stateless_responder_commands_queue_url },
-    { name = "Dynamo__IdempotencyTableName", value = module.idempotency.table_name },
-  ]
 }

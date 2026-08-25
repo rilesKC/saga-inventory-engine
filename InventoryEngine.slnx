@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Inventory.Domain/Inventory.Domain.csproj" />
+    <Project Path="src/OrderSaga.Aws/OrderSaga.Aws.csproj" />
     <Project Path="src/OrderSaga.Choreography.Host/OrderSaga.Choreography.Host.csproj" />
     <Project Path="src/OrderSaga.Choreography/OrderSaga.Choreography.csproj" />
     <Project Path="src/OrderSaga.Orchestration/OrderSaga.Orchestration.csproj" />
@@ -12,6 +13,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Inventory.Domain.Tests/Inventory.Domain.Tests.csproj" />
+    <Project Path="tests/OrderSaga.Aws.Tests/OrderSaga.Aws.Tests.csproj" />
     <Project Path="tests/OrderSaga.Choreography.Host.Tests/OrderSaga.Choreography.Host.Tests.csproj" />
     <Project Path="tests/OrderSaga.Choreography.Tests/OrderSaga.Choreography.Tests.csproj" />
     <Project Path="tests/OrderSaga.Orchestration.Tests/OrderSaga.Orchestration.Tests.csproj" />

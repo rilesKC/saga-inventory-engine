@@ -3,15 +3,15 @@ output "alb_dns_name" {
 }
 
 output "coordinator_ecr_repository_url" {
-  value = module.coordinator_iam_and_observability.ecr_repository_url
+  value = module.iam_and_observability["coordinator"].ecr_repository_url
 }
 
 output "inventory_ecr_repository_url" {
-  value = module.inventory_iam_and_observability.ecr_repository_url
+  value = module.iam_and_observability["inventory"].ecr_repository_url
 }
 
 output "responder_ecr_repository_url" {
-  value = module.responder_iam_and_observability.ecr_repository_url
+  value = module.iam_and_observability["responder"].ecr_repository_url
 }
 
 output "inventory_commands_queue_url" {

@@ -1,12 +1,15 @@
 using Amazon.DynamoDBv2;
 using Amazon.DynamoDBv2.Model;
+using OrderSaga.Aws;
 
 namespace OrderSaga.Choreography.Host;
 
 /// <summary>
 /// Claims a message ID via a conditional PutItem (attribute_not_exists) -- the canonical AWS
 /// idempotency-store pattern. No independent logic worth unit-testing in isolation; real
-/// conditional-write behavior is verified via LocalStack.
+/// conditional-write behavior is verified via LocalStack. Table name stays a hardcoded constant
+/// here rather than a constructor parameter (unlike orchestration's DynamoDbIdempotencyStore) --
+/// a deliberate, already-reviewed choice, not an oversight; see infra/variables.tf's comment.
 /// </summary>
 public sealed class DynamoDbIdempotencyStore : IIdempotencyStore
 {

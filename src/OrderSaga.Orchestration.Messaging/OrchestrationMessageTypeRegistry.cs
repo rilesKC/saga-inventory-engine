@@ -24,12 +24,20 @@ public static class OrchestrationMessageTypeRegistry
     };
 
     /// <summary>
-    /// Every known message type name -- what OutboundMessageForwarder subscribes to, and the set
-    /// Terraform's SQS queues must be able to carry (checked against each other for choreography's
-    /// equivalent; see EventTypeRegistryTerraformSyncTests for the pattern this could mirror if
-    /// orchestration's Terraform ever needs the same guard).
+    /// Every known message type name -- what OutboundMessageForwarder's constructor subscribes to.
+    /// Unlike choreography (whose equivalent list is checked against Terraform's EventBridge rules
+    /// in EventTypeRegistryTerraformSyncTests), orchestration's SQS queues aren't type-routed, so
+    /// there's no Terraform list to compare against here -- instead OutboundMessageForwarderTypeSyncTests
+    /// checks this list against the forwarder's actual runtime subscriptions.
     /// </summary>
     public static IReadOnlyCollection<string> KnownMessageTypeNames => TypesByName.Keys;
+
+    /// <summary>
+    /// The same set as <see cref="KnownMessageTypeNames"/>, as runtime Types instead of names --
+    /// exists so OutboundMessageForwarderTypeSyncTests can construct an instance of every known
+    /// message type without hardcoding a second, independently-drifting type list of its own.
+    /// </summary>
+    public static IReadOnlyCollection<Type> KnownMessageTypes => TypesByName.Values;
 
     public static MessageEnvelope Serialize(object message)
     {

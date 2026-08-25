@@ -7,13 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OrderSaga.Shared\OrderSaga.Shared.csproj" />
-    <ProjectReference Include="..\OrderSaga.Orchestration\OrderSaga.Orchestration.csproj" />
-    <ProjectReference Include="..\OrderSaga.Aws\OrderSaga.Aws.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="AWSSDK.DynamoDBv2" Version="4.0.103.4" />
     <PackageReference Include="AWSSDK.SQS" Version="4.0.100.10" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
   </ItemGroup>

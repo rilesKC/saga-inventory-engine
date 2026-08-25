@@ -3,24 +3,25 @@ using Amazon.SQS.Model;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace OrderSaga.Orchestration.Messaging;
+namespace OrderSaga.Aws;
 
 /// <summary>
-/// Thin AWS SDK plumbing wrapping <see cref="SqsMessageProcessor"/> (already unit-tested) with the
-/// actual receive/delete loop. Reused as-is by every Host, parameterized by queue URL -- nothing
-/// here is choreography- or orchestration-specific. Real behavior verified via LocalStack, not a
-/// unit test.
+/// Thin AWS SDK plumbing wrapping an <see cref="IMessageProcessor"/> (already unit-tested,
+/// choreography- or orchestration-specific) with the actual receive/delete loop -- nothing in this
+/// class is specific to either. Shared by both stacks specifically so a fix like the
+/// `deleteResponse.Failed` null-safety one below only has to be made once. Real behavior verified
+/// via LocalStack, not a unit test.
 /// </summary>
 public sealed class SqsPollingBackgroundService : BackgroundService
 {
     private readonly IAmazonSQS _client;
-    private readonly SqsMessageProcessor _processor;
+    private readonly IMessageProcessor _processor;
     private readonly string _queueUrl;
     private readonly ILogger<SqsPollingBackgroundService> _logger;
 
     public SqsPollingBackgroundService(
         IAmazonSQS client,
-        SqsMessageProcessor processor,
+        IMessageProcessor processor,
         string queueUrl,
         ILogger<SqsPollingBackgroundService> logger)
     {
@@ -45,6 +46,12 @@ public sealed class SqsPollingBackgroundService : BackgroundService
 
                 var processed = new List<DeleteMessageBatchRequestEntry>();
 
+                // Deliberately sequential, not Task.WhenAll over the batch: every message's
+                // processing ends in a synchronous EventBus.Publish call, and EventBus's dispatch
+                // state (_pending queue, _isDispatching flag) isn't synchronized -- concurrent
+                // Publish calls from two messages in this batch would race on that state. Fixing
+                // this safely means making the shared, already-tested EventBus thread-safe first;
+                // reviewed and deliberately deferred rather than bundled into an unrelated cleanup.
                 foreach (var message in response.Messages ?? [])
                 {
                     try
@@ -75,8 +82,9 @@ public sealed class SqsPollingBackgroundService : BackgroundService
 
                     // Null-safe, same reasoning as response.Messages above: real AWS returns
                     // Failed as null (not an empty list) when every entry in the batch succeeds --
-                    // LocalStack's emulation returned an empty list instead, so this only surfaced
-                    // once this ran against real AWS, not during LocalStack validation.
+                    // LocalStack's emulation returned an empty list instead, so this was only
+                    // caught by actually running against real AWS, not by LocalStack or a unit
+                    // test (see the orchestration AWS infra plan's task 28 retro).
                     foreach (var failed in deleteResponse.Failed ?? [])
                     {
                         // The message was already processed (claimed + published) at this point --

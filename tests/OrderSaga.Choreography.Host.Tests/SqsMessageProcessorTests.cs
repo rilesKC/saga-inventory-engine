@@ -1,4 +1,5 @@
 using System.Text.Json;
+using OrderSaga.Aws;
 using OrderSaga.Shared;
 
 namespace OrderSaga.Choreography.Host.Tests;
