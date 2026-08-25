@@ -10,6 +10,7 @@
     <ProjectReference Include="..\Inventory.Domain\Inventory.Domain.csproj" />
     <ProjectReference Include="..\OrderSaga.Shared\OrderSaga.Shared.csproj" />
     <ProjectReference Include="..\OrderSaga.Choreography\OrderSaga.Choreography.csproj" />
+    <ProjectReference Include="..\OrderSaga.Aws\OrderSaga.Aws.csproj" />
   </ItemGroup>
 
   <ItemGroup>

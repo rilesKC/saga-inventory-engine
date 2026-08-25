@@ -3,22 +3,25 @@ using Amazon.SQS.Model;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace OrderSaga.Choreography.Host;
+namespace OrderSaga.Aws;
 
 /// <summary>
-/// Thin AWS SDK plumbing wrapping <see cref="SqsMessageProcessor"/> (already unit-tested) with the
-/// actual receive/delete loop. Real behavior verified via LocalStack, not a unit test.
+/// Thin AWS SDK plumbing wrapping an <see cref="IMessageProcessor"/> (already unit-tested,
+/// choreography- or orchestration-specific) with the actual receive/delete loop -- nothing in this
+/// class is specific to either. Shared by both stacks specifically so a fix like the
+/// `deleteResponse.Failed` null-safety one below only has to be made once. Real behavior verified
+/// via LocalStack, not a unit test.
 /// </summary>
 public sealed class SqsPollingBackgroundService : BackgroundService
 {
     private readonly IAmazonSQS _client;
-    private readonly SqsMessageProcessor _processor;
+    private readonly IMessageProcessor _processor;
     private readonly string _queueUrl;
     private readonly ILogger<SqsPollingBackgroundService> _logger;
 
     public SqsPollingBackgroundService(
         IAmazonSQS client,
-        SqsMessageProcessor processor,
+        IMessageProcessor processor,
         string queueUrl,
         ILogger<SqsPollingBackgroundService> logger)
     {
@@ -43,6 +46,12 @@ public sealed class SqsPollingBackgroundService : BackgroundService
 
                 var processed = new List<DeleteMessageBatchRequestEntry>();
 
+                // Deliberately sequential, not Task.WhenAll over the batch: every message's
+                // processing ends in a synchronous EventBus.Publish call, and EventBus's dispatch
+                // state (_pending queue, _isDispatching flag) isn't synchronized -- concurrent
+                // Publish calls from two messages in this batch would race on that state. Fixing
+                // this safely means making the shared, already-tested EventBus thread-safe first;
+                // reviewed and deliberately deferred rather than bundled into an unrelated cleanup.
                 foreach (var message in response.Messages ?? [])
                 {
                     try
@@ -58,8 +67,7 @@ public sealed class SqsPollingBackgroundService : BackgroundService
                     {
                         // Deliberately not added to `processed`: letting the visibility timeout
                         // expire makes this message eligible for redelivery, eventually landing in
-                        // the DLQ per the queue's redrive policy (Terraform task 12) if it keeps
-                        // failing.
+                        // the DLQ per the queue's redrive policy, if it keeps failing.
                         _logger.LogWarning(ex, "Failed to process SQS message {MessageId}; leaving for retry.", message.MessageId);
                     }
                 }
@@ -72,23 +80,27 @@ public sealed class SqsPollingBackgroundService : BackgroundService
                         Entries = processed,
                     }, stoppingToken);
 
-                    foreach (var failed in deleteResponse.Failed)
+                    // Null-safe, same reasoning as response.Messages above: real AWS returns
+                    // Failed as null (not an empty list) when every entry in the batch succeeds --
+                    // LocalStack's emulation returned an empty list instead, so this was only
+                    // caught by actually running against real AWS, not by LocalStack or a unit
+                    // test (see the orchestration AWS infra plan's task 28 retro).
+                    foreach (var failed in deleteResponse.Failed ?? [])
                     {
-                        // The event was already processed (claimed + published) at this point --
-                        // a delete failure just means the message redelivers later and the claim
-                        // makes the redelivery a no-op, not a data-loss or double-processing risk.
+                        // The message was already processed (claimed + published) at this point --
+                        // a delete failure just means it redelivers later and the claim makes the
+                        // redelivery a no-op, not a data-loss or double-processing risk.
                         _logger.LogWarning("Failed to delete SQS message {MessageId} after successful processing: {Code}", failed.Id, failed.Code);
                     }
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // A failure here (e.g. ReceiveMessageAsync itself, or an unexpected response
-                // shape like the null Messages collection LocalStack returned on an empty poll)
-                // must not take the whole host down -- HostOptions.BackgroundServiceExceptionBehavior
-                // defaults to StopHost, and an unhandled exception escaping ExecuteAsync stops the
-                // entire application, not just this loop iteration. Caught crashing the whole app
-                // during LocalStack validation, not by any unit test.
+                // A failure here (e.g. ReceiveMessageAsync itself, or an unexpected response shape
+                // like a null Messages collection on an empty poll) must not take the whole host
+                // down -- HostOptions.BackgroundServiceExceptionBehavior defaults to StopHost, and
+                // an unhandled exception escaping ExecuteAsync stops the entire application, not
+                // just this loop iteration.
                 _logger.LogError(ex, "SQS poll failed; retrying after a short delay.");
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }

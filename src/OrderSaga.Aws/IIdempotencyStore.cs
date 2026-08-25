@@ -1,4 +1,4 @@
-namespace OrderSaga.Choreography.Host;
+namespace OrderSaga.Aws;
 
 public interface IIdempotencyStore
 {

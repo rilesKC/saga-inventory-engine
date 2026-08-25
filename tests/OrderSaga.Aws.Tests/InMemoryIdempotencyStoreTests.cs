@@ -1,4 +1,4 @@
-namespace OrderSaga.Choreography.Host.Tests;
+namespace OrderSaga.Aws.Tests;
 
 public class InMemoryIdempotencyStoreTests
 {

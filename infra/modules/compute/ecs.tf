@@ -16,17 +16,16 @@ resource "aws_ecs_task_definition" "this" {
       name      = var.name
       image     = "${var.ecr_repository_url}:${var.image_tag}"
       essential = true
-      portMappings = [
+      portMappings = var.target_group_arn == null ? [] : [
         {
           containerPort = var.app_port
           protocol      = "tcp"
         }
       ]
-      environment = [
-        { name = "Sqs__QueueUrl", value = var.queue_url },
-        { name = "EventBridge__BusName", value = var.event_bus_name },
-        { name = "AWS_REGION", value = var.aws_region },
-      ]
+      environment = concat(
+        [{ name = "AWS_REGION", value = var.aws_region }],
+        var.environment_variables
+      )
       logConfiguration = {
         logDriver = "awslogs"
         options = {
@@ -45,26 +44,32 @@ resource "aws_ecs_service" "this" {
   task_definition = aws_ecs_task_definition.this.arn
   launch_type     = "FARGATE"
 
-  # Desired count 1, not >=2 -- see the plan's task 10 retro. InventoryItem's in-memory state
-  # isn't shared across instances yet; a second instance would silently diverge from the first the
-  # moment a saga's events got load-balanced across both. Scoped down deliberately until a future
-  # persistence spec makes multi-instance state safe. The VPC/subnets/ALB stay multi-AZ-capable
-  # regardless, so raising this back to >=2 later is a one-line change, not a redesign.
-  desired_count = 1
+  # Defaults to 1 -- most callers hold in-memory state that isn't safe to share across instances
+  # yet (see the choreography plan's task 10 retro: a second instance would silently diverge from
+  # the first the moment a saga's events got load-balanced across both). Callers with no such
+  # state -- the orchestration stateless-responders service -- override this to run >=2 for real.
+  desired_count = var.desired_count
 
   network_configuration {
     subnets         = var.private_subnet_ids
     security_groups = [var.app_security_group_id]
   }
 
-  load_balancer {
-    target_group_arn = var.target_group_arn
-    container_name   = var.name
-    container_port   = var.app_port
+  # Skipped entirely for a service with no target group (InventoryHost, ResponderHost) -- they
+  # have no HTTP surface, so there's nothing for an ALB to route to.
+  dynamic "load_balancer" {
+    for_each = var.target_group_arn == null ? [] : [var.target_group_arn]
+
+    content {
+      target_group_arn = load_balancer.value
+      container_name   = var.name
+      container_port   = var.app_port
+    }
   }
 
   # No depends_on here -- `depends_on` needs a real resource/module reference, not a string ARN
   # variable, so that dependency can only be expressed where both modules are actually
-  # instantiated. Task 19's root module MUST declare `depends_on = [module.load_balancer]` on this
-  # module so the service isn't created before the ALB has a live listener.
+  # instantiated. A root module wiring this service behind an ALB must declare
+  # `depends_on = [module.load_balancer]` on this module so the service isn't created before the
+  # ALB has a live listener.
 }

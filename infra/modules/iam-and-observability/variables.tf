@@ -3,19 +3,12 @@ variable "name" {
   type        = string
 }
 
-variable "event_bus_arn" {
-  description = "ARN of the EventBridge bus the task role may PutEvents to (from the messaging module)."
-  type        = string
-}
-
-variable "queue_arn" {
-  description = "ARN of the SQS queue the task role may receive/delete from (from the messaging module)."
-  type        = string
-}
-
-variable "idempotency_table_arn" {
-  description = "ARN of the DynamoDB idempotency table the task role may PutItem to (from the idempotency module)."
-  type        = string
+variable "task_policy_statements" {
+  description = "Least-privilege IAM policy statements for this service's task role, supplied by the caller -- deliberately generic (actions + resources per statement) rather than hardcoded to any one service's fixed set of permissions."
+  type = list(object({
+    actions   = list(string)
+    resources = list(string)
+  }))
 }
 
 variable "log_retention_days" {

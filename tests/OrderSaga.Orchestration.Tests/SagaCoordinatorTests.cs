@@ -8,7 +8,7 @@ public class SagaCoordinatorTests
     public void OnOrderPlaced_CreatesSagaStateAndPublishesReserveStockCommand()
     {
         var bus = new EventBus();
-        var coordinator = new SagaCoordinator(bus);
+        var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus));
         ReserveStockCommand? published = null;
         bus.Subscribe<ReserveStockCommand>(e => published = e);
 
@@ -25,7 +25,7 @@ public class SagaCoordinatorTests
     public void OnStockReservedReply_PublishesChargePaymentCommandWithSagaAmount()
     {
         var bus = new EventBus();
-        var coordinator = new SagaCoordinator(bus);
+        var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus));
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
         ChargePaymentCommand? published = null;
         bus.Subscribe<ChargePaymentCommand>(e => published = e);
@@ -43,7 +43,7 @@ public class SagaCoordinatorTests
     public void OnStockReservationFailedReply_MarksSagaFailed()
     {
         var bus = new EventBus();
-        var coordinator = new SagaCoordinator(bus);
+        var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus));
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
 
         bus.Publish(new StockReservationFailedReply("ORDER-1", "SKU-1"));
@@ -55,7 +55,7 @@ public class SagaCoordinatorTests
     public void OnPaymentChargedReply_PublishesConfirmReservationCommand()
     {
         var bus = new EventBus();
-        var coordinator = new SagaCoordinator(bus);
+        var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus));
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
         ConfirmReservationCommand? published = null;
         bus.Subscribe<ConfirmReservationCommand>(e => published = e);
@@ -72,7 +72,7 @@ public class SagaCoordinatorTests
     public void OnPaymentDeclinedReply_PublishesReleaseReservationCommand()
     {
         var bus = new EventBus();
-        var coordinator = new SagaCoordinator(bus);
+        var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus));
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 999.99m));
         ReleaseReservationCommand? published = null;
         bus.Subscribe<ReleaseReservationCommand>(e => published = e);
@@ -89,7 +89,7 @@ public class SagaCoordinatorTests
     public void OnReservationConfirmedReply_PublishesScheduleShipmentCommand()
     {
         var bus = new EventBus();
-        var coordinator = new SagaCoordinator(bus);
+        var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus));
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
         ScheduleShipmentCommand? published = null;
         bus.Subscribe<ScheduleShipmentCommand>(e => published = e);
@@ -106,7 +106,7 @@ public class SagaCoordinatorTests
     public void OnReservationReleasedReply_MarksSagaCompensated()
     {
         var bus = new EventBus();
-        var coordinator = new SagaCoordinator(bus);
+        var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus));
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 999.99m));
 
         bus.Publish(new ReservationReleasedReply("ORDER-1", "SKU-1"));
@@ -118,7 +118,7 @@ public class SagaCoordinatorTests
     public void OnShipmentScheduledReply_MarksSagaCompleted()
     {
         var bus = new EventBus();
-        var coordinator = new SagaCoordinator(bus);
+        var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus));
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
 
         bus.Publish(new ShipmentScheduledReply("ORDER-1", "SKU-1"));

@@ -8,7 +8,7 @@ public class PaymentResponderTests
     public void OnChargePaymentCommand_AmountAtOrBelowThreshold_PublishesPaymentChargedReply()
     {
         var bus = new EventBus();
-        _ = new PaymentResponder(bus, 500m);
+        _ = new PaymentResponder(new InboundEventBus(bus), new OutboundEventBus(bus), 500m);
         PaymentChargedReply? published = null;
         bus.Subscribe<PaymentChargedReply>(e => published = e);
 
@@ -23,7 +23,7 @@ public class PaymentResponderTests
     public void OnChargePaymentCommand_AmountAboveThreshold_PublishesPaymentDeclinedReply()
     {
         var bus = new EventBus();
-        _ = new PaymentResponder(bus, 500m);
+        _ = new PaymentResponder(new InboundEventBus(bus), new OutboundEventBus(bus), 500m);
         PaymentDeclinedReply? published = null;
         bus.Subscribe<PaymentDeclinedReply>(e => published = e);
 

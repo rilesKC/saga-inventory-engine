@@ -10,10 +10,10 @@ public class OrderSagaOrchestrationIntegrationTests
     {
         var bus = new EventBus();
         var item = InventoryItem.Seed(sku, initialQuantity);
-        var coordinator = new SagaCoordinator(bus);
-        _ = new InventoryResponder(bus, new Dictionary<string, InventoryItem> { [sku] = item });
-        _ = new PaymentResponder(bus, threshold);
-        _ = new ShippingResponder(bus);
+        var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus));
+        _ = new InventoryResponder(new InboundEventBus(bus), new OutboundEventBus(bus), new Dictionary<string, InventoryItem> { [sku] = item });
+        _ = new PaymentResponder(new InboundEventBus(bus), new OutboundEventBus(bus), threshold);
+        _ = new ShippingResponder(new InboundEventBus(bus), new OutboundEventBus(bus));
         return (bus, coordinator, item);
     }
 
