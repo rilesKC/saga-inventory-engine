@@ -248,8 +248,29 @@ you'd rather go a different way):
         both the main queue and DLQ empty afterward. Confirmed via direct SQS/DynamoDB query API
         calls (no AWS CLI installed), not just log inspection.
 
-- [ ] 22. Real AWS deployment
-      - File(s): none new
-      - Verification: `terraform apply` against real AWS succeeds; one real order run through the
-        deployed HTTP endpoint completes successfully; teardown/cost note recorded once confirmed
-        working, so the deployment isn't left running indefinitely by accident.
+- [x] 22. Real AWS deployment
+      - File(s): `infra/modules/iam-and-observability/ecr.tf` (added `force_delete = true`)
+      - Verification: `terraform apply` against real AWS succeeded (52 resources: 49 infra +
+        3 compute, applied in two passes so the ECS service didn't try to launch against an
+        image that didn't exist yet); all three saga paths run for real (happy path, insufficient
+        stock, payment declined) — 11 total idempotency claims exactly matching LocalStack's
+        result (5+2+4), both queues empty afterward, verified via the AWS CLI (installed via
+        winget) directly against SQS/DynamoDB, not log inspection alone. Torn down immediately
+        after confirming it worked; confirmed via direct AWS queries (NAT gateway, ALB, ECS
+        cluster, VPC, ECR all gone) that nothing was left running or accruing cost.
+      - ⚠ Retro: two real findings from this task.
+        1. **The deployed image was stale.** The Docker image had been built in task 20, *before*
+           any of task 21's LocalStack-discovered fixes. Every fix after that was validated by
+           running `dotnet run` locally, not by rebuilding the image -- so what got pushed to ECR
+           at the start of this task still had the pre-fix bugs, including the exact same
+           `NullReferenceException` that crashed the whole host. Rebuilding the image before
+           pushing is now something to do as standard practice whenever code changes after the
+           last `docker build`, not just once per plan.
+        2. **`terraform destroy` failed outright on the ECR repository** once an image had been
+           pushed to it -- ECR refuses to delete a non-empty repository, and `aws_ecr_repository`
+           doesn't default to `force_delete`. Given this project's whole deployment model is
+           "verify, then tear down immediately," this would have failed on *every* real deploy.
+           Fixed by adding `force_delete = true` -- but the fix itself required its own `apply`
+           before `destroy` would honor it, since the flag lives in Terraform state, not just the
+           `.tf` file; changing the file alone didn't retroactively affect the already-created
+           resource.
