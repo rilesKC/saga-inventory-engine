@@ -44,6 +44,11 @@ variable "queue_url" {
   type = string
 }
 
+variable "event_bus_name" {
+  description = "Passed to the container as EventBridge__BusName -- EventBridgeEventPublisher reads it from configuration instead of hardcoding it, so it can never drift from the bus this module's caller actually created."
+  type        = string
+}
+
 variable "app_port" {
   type    = number
   default = 8080

@@ -11,8 +11,6 @@ module "networking" {
 module "messaging" {
   source = "./modules/messaging"
 
-  # var.name's default ("order-saga-choreography") matches EventBridgeEventPublisher's hardcoded
-  # EventBusName constant -- see task 13's reminder.
   name = var.name
 }
 
@@ -54,6 +52,7 @@ module "compute" {
   image_tag               = var.image_tag
   log_group_name          = module.iam_and_observability.log_group_name
   queue_url               = module.messaging.queue_url
+  event_bus_name          = module.messaging.event_bus_name
 
   # Real resource/module reference, unlike the string-ARN attempt task 17's retro flagged --
   # ensures the ALB listener exists before the ECS service tries to register against it.

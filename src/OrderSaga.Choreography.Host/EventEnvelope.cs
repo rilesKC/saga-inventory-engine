@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace OrderSaga.Choreography.Host;
 
-public sealed record EventEnvelope(string MessageId, string EventType, string Payload);
+public sealed record EventEnvelope(string MessageId, string EventType, JsonElement Payload);

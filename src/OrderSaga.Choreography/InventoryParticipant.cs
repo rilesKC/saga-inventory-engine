@@ -5,18 +5,21 @@ namespace OrderSaga.Choreography;
 
 public sealed class InventoryParticipant
 {
-    private readonly EventBus _inbound;
-    private readonly EventBus _outbound;
+    private readonly InboundEventBus _inbound;
+    private readonly OutboundEventBus _outbound;
     private readonly Dictionary<string, InventoryItem> _items;
 
     /// <param name="inbound">Subscribed to for trigger events.</param>
     /// <param name="outbound">Published to for produced events. In-process choreography (this
-    /// project's own tests) passes the same instance for both -- direct participant-to-participant
-    /// reaction is exactly what's being tested there. The Host layer (saga-inventory-engine's AWS
-    /// deployment) passes two separate instances so a participant's output only reaches the
-    /// EventBridge-forwarding layer, not sibling participants directly -- every cross-participant
-    /// reaction there is meant to happen via the real SQS round-trip, not an in-process shortcut.</param>
-    public InventoryParticipant(EventBus inbound, EventBus outbound, Dictionary<string, InventoryItem> items)
+    /// project's own tests) wraps the same underlying EventBus for both -- direct
+    /// participant-to-participant reaction is exactly what's being tested there. The Host layer
+    /// (saga-inventory-engine's AWS deployment) wraps two separate EventBus instances so a
+    /// participant's output only reaches the EventBridge-forwarding layer, not sibling participants
+    /// directly -- every cross-participant reaction there is meant to happen via the real SQS
+    /// round-trip, not an in-process shortcut. InboundEventBus/OutboundEventBus being distinct
+    /// types (rather than both just EventBus) means the compiler catches the two parameters being
+    /// swapped -- an unbounded republish loop was caused by exactly that shape of bug once already.</param>
+    public InventoryParticipant(InboundEventBus inbound, OutboundEventBus outbound, Dictionary<string, InventoryItem> items)
     {
         _inbound = inbound;
         _outbound = outbound;

@@ -41,19 +41,43 @@ public sealed class SqsPollingBackgroundService : BackgroundService
                     WaitTimeSeconds = 20,
                 }, stoppingToken);
 
+                var processed = new List<DeleteMessageBatchRequestEntry>();
+
                 foreach (var message in response.Messages ?? [])
                 {
                     try
                     {
-                        _processor.ProcessMessage(message.Body);
-                        await _client.DeleteMessageAsync(_queueUrl, message.ReceiptHandle, stoppingToken);
+                        await _processor.ProcessMessageAsync(message.Body, stoppingToken);
+                        processed.Add(new DeleteMessageBatchRequestEntry
+                        {
+                            Id = message.MessageId,
+                            ReceiptHandle = message.ReceiptHandle,
+                        });
                     }
                     catch (Exception ex)
                     {
-                        // Deliberately not deleted: letting the visibility timeout expire makes
-                        // this message eligible for redelivery, eventually landing in the DLQ per
-                        // the queue's redrive policy (Terraform task 12) if it keeps failing.
+                        // Deliberately not added to `processed`: letting the visibility timeout
+                        // expire makes this message eligible for redelivery, eventually landing in
+                        // the DLQ per the queue's redrive policy (Terraform task 12) if it keeps
+                        // failing.
                         _logger.LogWarning(ex, "Failed to process SQS message {MessageId}; leaving for retry.", message.MessageId);
+                    }
+                }
+
+                if (processed.Count > 0)
+                {
+                    var deleteResponse = await _client.DeleteMessageBatchAsync(new DeleteMessageBatchRequest
+                    {
+                        QueueUrl = _queueUrl,
+                        Entries = processed,
+                    }, stoppingToken);
+
+                    foreach (var failed in deleteResponse.Failed)
+                    {
+                        // The event was already processed (claimed + published) at this point --
+                        // a delete failure just means the message redelivers later and the claim
+                        // makes the redelivery a no-op, not a data-loss or double-processing risk.
+                        _logger.LogWarning("Failed to delete SQS message {MessageId} after successful processing: {Code}", failed.Id, failed.Code);
                     }
                 }
             }

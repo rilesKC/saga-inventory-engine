@@ -5,13 +5,13 @@ namespace OrderSaga.Choreography;
 
 public sealed class ShippingStub
 {
-    private readonly EventBus _inbound;
-    private readonly EventBus _outbound;
+    private readonly InboundEventBus _inbound;
+    private readonly OutboundEventBus _outbound;
 
     /// <param name="inbound">Subscribed to for trigger events.</param>
     /// <param name="outbound">Published to for produced events. See
     /// <see cref="InventoryParticipant"/>'s constructor for why these are separate.</param>
-    public ShippingStub(EventBus inbound, EventBus outbound)
+    public ShippingStub(InboundEventBus inbound, OutboundEventBus outbound)
     {
         _inbound = inbound;
         _outbound = outbound;

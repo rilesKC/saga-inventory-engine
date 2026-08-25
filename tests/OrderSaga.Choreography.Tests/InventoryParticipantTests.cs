@@ -10,7 +10,7 @@ public class InventoryParticipantTests
     {
         var bus = new EventBus();
         var item = InventoryItem.Seed("SKU-1", 10);
-        _ = new InventoryParticipant(bus, bus, new Dictionary<string, InventoryItem> { ["SKU-1"] = item });
+        _ = new InventoryParticipant(new InboundEventBus(bus), new OutboundEventBus(bus), new Dictionary<string, InventoryItem> { ["SKU-1"] = item });
         StockReserved? published = null;
         bus.Subscribe<StockReserved>(e => published = e);
 
@@ -28,7 +28,7 @@ public class InventoryParticipantTests
     {
         var bus = new EventBus();
         var item = InventoryItem.Seed("SKU-1", 10);
-        _ = new InventoryParticipant(bus, bus, new Dictionary<string, InventoryItem> { ["SKU-1"] = item });
+        _ = new InventoryParticipant(new InboundEventBus(bus), new OutboundEventBus(bus), new Dictionary<string, InventoryItem> { ["SKU-1"] = item });
         StockReservationFailed? published = null;
         bus.Subscribe<StockReservationFailed>(e => published = e);
 
@@ -46,7 +46,7 @@ public class InventoryParticipantTests
         var bus = new EventBus();
         var item = InventoryItem.Seed("SKU-1", 10);
         item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
-        _ = new InventoryParticipant(bus, bus, new Dictionary<string, InventoryItem> { ["SKU-1"] = item });
+        _ = new InventoryParticipant(new InboundEventBus(bus), new OutboundEventBus(bus), new Dictionary<string, InventoryItem> { ["SKU-1"] = item });
         ReservationConfirmed? published = null;
         bus.Subscribe<ReservationConfirmed>(e => published = e);
 
@@ -65,7 +65,7 @@ public class InventoryParticipantTests
         var bus = new EventBus();
         var item = InventoryItem.Seed("SKU-1", 10);
         item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
-        _ = new InventoryParticipant(bus, bus, new Dictionary<string, InventoryItem> { ["SKU-1"] = item });
+        _ = new InventoryParticipant(new InboundEventBus(bus), new OutboundEventBus(bus), new Dictionary<string, InventoryItem> { ["SKU-1"] = item });
         ReservationReleased? published = null;
         bus.Subscribe<ReservationReleased>(e => published = e);
 

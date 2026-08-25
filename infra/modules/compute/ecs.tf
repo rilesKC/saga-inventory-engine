@@ -24,6 +24,7 @@ resource "aws_ecs_task_definition" "this" {
       ]
       environment = [
         { name = "Sqs__QueueUrl", value = var.queue_url },
+        { name = "EventBridge__BusName", value = var.event_bus_name },
         { name = "AWS_REGION", value = var.aws_region },
       ]
       logConfiguration = {

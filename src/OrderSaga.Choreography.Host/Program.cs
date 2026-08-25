@@ -46,7 +46,13 @@ builder.Services.AddSingleton<IAmazonDynamoDB>(_ =>
     return new AmazonDynamoDBClient(config);
 });
 
-builder.Services.AddSingleton<IEventPublisher, EventBridgeEventPublisher>();
+var eventBusName = builder.Configuration["EventBridge:BusName"]
+    ?? throw new InvalidOperationException("Configuration value 'EventBridge:BusName' is required.");
+
+builder.Services.AddSingleton<IEventPublisher>(sp => new EventBridgeEventPublisher(
+    sp.GetRequiredService<IAmazonEventBridge>(),
+    eventBusName,
+    sp.GetRequiredService<IHostApplicationLifetime>()));
 builder.Services.AddSingleton<IIdempotencyStore, DynamoDbIdempotencyStore>();
 
 // Two separate buses, deliberately -- see InventoryParticipant's constructor doc comment.
@@ -55,7 +61,10 @@ builder.Services.AddSingleton<IIdempotencyStore, DynamoDbIdempotencyStore>();
 // OutboundEventForwarder subscribes to. Sharing one bus for both directions caused every
 // participant to also react to sibling participants directly and synchronously, in-process,
 // completely bypassing the SQS round-trip the spec calls for -- an unbounded republish loop,
-// discovered only by actually running this against LocalStack, not by any unit test.
+// discovered only by actually running this against LocalStack, not by any unit test. Participants
+// are wired below through InboundEventBus/OutboundEventBus (not the raw EventBus instances
+// directly) so the compiler -- not just this comment -- rejects a future participant accidentally
+// getting the two swapped. HostParticipantWiring's own tests exercise this exact composition.
 var inboundBus = new EventBus();
 var outboundBus = new EventBus();
 
@@ -69,9 +78,7 @@ var items = new Dictionary<string, InventoryItem>
 // Constructed directly (not via DI) since their constructors' only real job is subscribing to
 // inboundBus -- that subscription keeps them alive for as long as inboundBus does, which outlives
 // the whole application via the SqsMessageProcessor singleton below.
-_ = new InventoryParticipant(inboundBus, outboundBus, items);
-_ = new PaymentStub(inboundBus, outboundBus, threshold: 500m);
-_ = new ShippingStub(inboundBus, outboundBus);
+HostParticipantWiring.Wire(new InboundEventBus(inboundBus), new OutboundEventBus(outboundBus), items, paymentDeclineThreshold: 500m);
 
 builder.Services.AddSingleton(sp => new OutboundEventForwarder(outboundBus, sp.GetRequiredService<IEventPublisher>()));
 builder.Services.AddSingleton(sp => new SqsMessageProcessor(inboundBus, sp.GetRequiredService<IIdempotencyStore>()));

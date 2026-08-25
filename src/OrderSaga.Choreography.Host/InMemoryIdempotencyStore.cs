@@ -10,5 +10,12 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
 {
     private readonly ConcurrentDictionary<string, byte> _claimed = new();
 
-    public bool TryClaim(string messageId) => _claimed.TryAdd(messageId, 0);
+    public Task<bool> TryClaimAsync(string messageId, CancellationToken cancellationToken) =>
+        Task.FromResult(_claimed.TryAdd(messageId, 0));
+
+    public Task ReleaseAsync(string messageId, CancellationToken cancellationToken)
+    {
+        _claimed.TryRemove(messageId, out _);
+        return Task.CompletedTask;
+    }
 }

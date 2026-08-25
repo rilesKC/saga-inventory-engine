@@ -19,11 +19,11 @@ public sealed class DynamoDbIdempotencyStore : IIdempotencyStore
         _client = client;
     }
 
-    public bool TryClaim(string messageId)
+    public async Task<bool> TryClaimAsync(string messageId, CancellationToken cancellationToken)
     {
         try
         {
-            _client.PutItemAsync(new PutItemRequest
+            await _client.PutItemAsync(new PutItemRequest
             {
                 TableName = TableName,
                 Item = new Dictionary<string, AttributeValue>
@@ -31,7 +31,7 @@ public sealed class DynamoDbIdempotencyStore : IIdempotencyStore
                     ["MessageId"] = new AttributeValue { S = messageId },
                 },
                 ConditionExpression = "attribute_not_exists(MessageId)",
-            }).GetAwaiter().GetResult();
+            }, cancellationToken);
 
             return true;
         }
@@ -40,4 +40,14 @@ public sealed class DynamoDbIdempotencyStore : IIdempotencyStore
             return false;
         }
     }
+
+    public Task ReleaseAsync(string messageId, CancellationToken cancellationToken) =>
+        _client.DeleteItemAsync(new DeleteItemRequest
+        {
+            TableName = TableName,
+            Key = new Dictionary<string, AttributeValue>
+            {
+                ["MessageId"] = new AttributeValue { S = messageId },
+            },
+        }, cancellationToken);
 }

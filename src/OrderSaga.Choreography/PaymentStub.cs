@@ -5,15 +5,15 @@ namespace OrderSaga.Choreography;
 
 public sealed class PaymentStub
 {
-    private readonly EventBus _inbound;
-    private readonly EventBus _outbound;
+    private readonly InboundEventBus _inbound;
+    private readonly OutboundEventBus _outbound;
     private readonly decimal _threshold;
     private readonly Dictionary<string, decimal> _amountsByOrderId = [];
 
     /// <param name="inbound">Subscribed to for trigger events.</param>
     /// <param name="outbound">Published to for produced events. See
     /// <see cref="InventoryParticipant"/>'s constructor for why these are separate.</param>
-    public PaymentStub(EventBus inbound, EventBus outbound, decimal threshold)
+    public PaymentStub(InboundEventBus inbound, OutboundEventBus outbound, decimal threshold)
     {
         _inbound = inbound;
         _outbound = outbound;

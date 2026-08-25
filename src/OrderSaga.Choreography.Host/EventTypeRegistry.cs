@@ -19,17 +19,24 @@ public static class EventTypeRegistry
         [nameof(ShipmentScheduled)] = typeof(ShipmentScheduled),
     };
 
+    /// <summary>
+    /// The full set of event type names this registry knows how to (de)serialize -- also the set
+    /// Terraform's EventBridge rules (infra/modules/messaging/eventbridge.tf) must route, checked
+    /// against each other in EventTypeRegistryTerraformSyncTests.
+    /// </summary>
+    public static IReadOnlyCollection<string> KnownEventTypeNames => TypesByName.Keys;
+
     public static EventEnvelope Serialize(object @event)
     {
         var eventType = @event.GetType();
-        var payload = JsonSerializer.Serialize(@event, eventType);
+        var payload = JsonSerializer.SerializeToElement(@event, eventType);
         return new EventEnvelope(Guid.NewGuid().ToString(), eventType.Name, payload);
     }
 
     public static object Deserialize(EventEnvelope envelope)
     {
         var type = TypesByName[envelope.EventType];
-        return JsonSerializer.Deserialize(envelope.Payload, type)
+        return envelope.Payload.Deserialize(type)
             ?? throw new InvalidOperationException($"Failed to deserialize event of type '{envelope.EventType}'.");
     }
 }

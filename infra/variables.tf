@@ -1,5 +1,5 @@
 variable "name" {
-  description = "Base name for every resource across all modules. Must match EventBridgeEventPublisher's/DynamoDbIdempotencyStore's hardcoded constants."
+  description = "Base name for every resource across all modules. The EventBridge bus this produces flows to the app as configuration (EventBridge__BusName), so overriding it is safe; the idempotency table name is not wired the same way yet and must still match DynamoDbIdempotencyStore's hardcoded TableName constant."
   type        = string
   default     = "order-saga-choreography"
 }

@@ -19,7 +19,7 @@ public sealed class SqsMessageProcessor
         _idempotencyStore = idempotencyStore;
     }
 
-    public void ProcessMessage(string rawBody)
+    public async Task ProcessMessageAsync(string rawBody, CancellationToken cancellationToken)
     {
         // The raw SQS message body is the full EventBridge event structure (version, id,
         // detail-type, source, account, time, region, detail, ...), not our EventEnvelope
@@ -31,12 +31,32 @@ public sealed class SqsMessageProcessor
         var envelope = document.RootElement.GetProperty("detail").Deserialize<EventEnvelope>()
             ?? throw new InvalidOperationException("SQS message's EventBridge 'detail' did not deserialize to an EventEnvelope.");
 
-        if (!_idempotencyStore.TryClaim(envelope.MessageId))
+        if (!await _idempotencyStore.TryClaimAsync(envelope.MessageId, cancellationToken))
         {
             return;
         }
 
-        var @event = EventTypeRegistry.Deserialize(envelope);
-        _bus.Publish(@event);
+        try
+        {
+            var @event = EventTypeRegistry.Deserialize(envelope);
+
+            // Publish itself stays synchronous -- it dispatches straight through participants'
+            // handlers (EventBus.Subscribe only takes Action<T>), which is why the idempotency
+            // claim above is the only genuinely awaitable I/O left in this method; the AWS call
+            // downstream of Publish (EventBridgeEventPublisher) can't be awaited without changing
+            // EventBus itself. See EventBridgeEventPublisher's constructor comment.
+            _bus.Publish(@event);
+        }
+        catch
+        {
+            // The claim was taken before dispatch specifically to stop two concurrent deliveries
+            // from both passing TryClaim and double-processing. But that means a failure here (a
+            // participant's outbound EventBridge publish throwing, for example) must release the
+            // claim -- otherwise this message, deliberately left un-deleted so SQS can redeliver
+            // it, finds the MessageId already claimed on retry and silently no-ops instead of
+            // retrying, permanently dropping the event.
+            await _idempotencyStore.ReleaseAsync(envelope.MessageId, cancellationToken);
+            throw;
+        }
     }
 }

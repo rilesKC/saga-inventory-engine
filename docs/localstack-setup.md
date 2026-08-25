@@ -40,7 +40,7 @@ AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test terraform apply -auto-approve 
   -var="localstack_endpoint=http://localhost:4566"
 ```
 
-Note the `queue_url` output — you'll need it for the Host app below.
+Note the `queue_url` and `event_bus_name` outputs — you'll need both for the Host app below.
 
 ## Running the Host app against it
 
@@ -51,6 +51,7 @@ cd src/OrderSaga.Choreography.Host
 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_REGION=us-east-1 \
   Aws__ServiceUrl=http://localhost:4566 \
   Sqs__QueueUrl="<queue_url output from above>" \
+  EventBridge__BusName="<event_bus_name output from above, "order-saga-choreography" by default>" \
   dotnet run
 ```
 

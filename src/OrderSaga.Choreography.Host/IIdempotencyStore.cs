@@ -2,5 +2,7 @@ namespace OrderSaga.Choreography.Host;
 
 public interface IIdempotencyStore
 {
-    bool TryClaim(string messageId);
+    Task<bool> TryClaimAsync(string messageId, CancellationToken cancellationToken);
+
+    Task ReleaseAsync(string messageId, CancellationToken cancellationToken);
 }
