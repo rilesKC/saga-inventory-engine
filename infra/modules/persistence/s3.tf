@@ -50,9 +50,11 @@ resource "aws_s3_bucket_policy" "archive_https_only" {
   })
 }
 
-# SonarCloud flags a bucket with no server access logging as a security finding. A second bucket
-# is the standard AWS pattern for the log target -- it isn't itself logged (that would be circular),
-# which is the accepted stopping point for this rule, not an oversight.
+# A second bucket is the standard AWS pattern for the log target. It logs to itself (AWS's own
+# documented pattern for "who logs the log bucket" -- S3 access logging explicitly supports the
+# target bucket being the same as the source bucket), and carries the same HTTPS-only deny
+# statement as the archive bucket, so it doesn't reintroduce the two findings this whole file
+# exists to close.
 resource "aws_s3_bucket" "archive_logs" {
   bucket        = "${var.archive_bucket_name}-logs"
   force_destroy = true
@@ -71,7 +73,7 @@ resource "aws_s3_bucket_public_access_block" "archive_logs" {
   restrict_public_buckets = true
 }
 
-resource "aws_s3_bucket_policy" "archive_logs_allow_log_delivery" {
+resource "aws_s3_bucket_policy" "archive_logs" {
   bucket = aws_s3_bucket.archive_logs.id
 
   policy = jsonencode({
@@ -91,6 +93,21 @@ resource "aws_s3_bucket_policy" "archive_logs_allow_log_delivery" {
             "aws:SourceAccount" = data.aws_caller_identity.current.account_id
           }
         }
+      },
+      {
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource = [
+          aws_s3_bucket.archive_logs.arn,
+          "${aws_s3_bucket.archive_logs.arn}/*",
+        ]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
       }
     ]
   })
@@ -98,6 +115,13 @@ resource "aws_s3_bucket_policy" "archive_logs_allow_log_delivery" {
 
 resource "aws_s3_bucket_logging" "archive" {
   bucket = aws_s3_bucket.archive.id
+
+  target_bucket = aws_s3_bucket.archive_logs.id
+  target_prefix = "log/"
+}
+
+resource "aws_s3_bucket_logging" "archive_logs" {
+  bucket = aws_s3_bucket.archive_logs.id
 
   target_bucket = aws_s3_bucket.archive_logs.id
   target_prefix = "log/"
