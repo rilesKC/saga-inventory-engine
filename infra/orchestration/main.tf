@@ -32,6 +32,20 @@ module "load_balancer" {
   public_subnet_ids = module.networking.public_subnet_ids
 }
 
+# One shared Atlas cluster + S3 bucket for this stack (Coordinator's SagaState and Inventory's
+# InventoryItem events live in the same cluster, different collections/databases) -- same
+# independence-from-choreography reasoning as this root's other resources, per
+# docs/specs/saga-persistence.md.
+module "persistence" {
+  source = "../modules/persistence"
+
+  atlas_org_id        = var.atlas_org_id
+  project_name        = "${var.name}-persistence"
+  database_name       = "orchestration"
+  nat_gateway_ip      = module.networking.nat_gateway_ip
+  archive_bucket_name = "${var.name}-event-archive"
+}
+
 # Outbound-only security group for the two services with no HTTP surface (Inventory, Responder) --
 # small and specific enough to this root's shape that it doesn't warrant its own module the way
 # the ALB-attached security group does inside load-balancer/.
@@ -74,15 +88,26 @@ locals {
           actions   = ["dynamodb:PutItem", "dynamodb:DeleteItem"]
           resources = [module.idempotency.table_arn]
         },
+        {
+          actions   = ["s3:PutObject"]
+          resources = ["${module.persistence.archive_bucket_arn}/*"]
+        },
       ]
       app_security_group_id = module.load_balancer.app_security_group_id
       target_group_arn      = module.load_balancer.target_group_arn
-      desired_count         = null
+      # Raised from 1 as part of the Saga Persistence spec -- proof that SagaState's Mongo-backed
+      # persistence actually unblocks multi-instance operation, not just that the config now
+      # allows it. See docs/plans/saga-persistence-plan.md task 21.
+      desired_count = 2
       environment_variables = [
         { name = "Sqs__InventoryCommandsQueueUrl", value = module.orchestration_messaging.inventory_commands_queue_url },
         { name = "Sqs__StatelessResponderCommandsQueueUrl", value = module.orchestration_messaging.stateless_responder_commands_queue_url },
         { name = "Sqs__CoordinatorInboundQueueUrl", value = module.orchestration_messaging.coordinator_inbound_queue_url },
         { name = "Dynamo__IdempotencyTableName", value = module.idempotency.table_name },
+        { name = "Mongo__ConnectionString", value = module.persistence.connection_string },
+        { name = "Mongo__DatabaseName", value = "orchestration" },
+        { name = "Mongo__SagaStateCollectionName", value = "saga-state" },
+        { name = "S3__ArchiveBucketName", value = module.persistence.archive_bucket_name },
       ]
     }
     inventory = {
@@ -99,14 +124,25 @@ locals {
           actions   = ["dynamodb:PutItem", "dynamodb:DeleteItem"]
           resources = [module.idempotency.table_arn]
         },
+        {
+          actions   = ["s3:PutObject"]
+          resources = ["${module.persistence.archive_bucket_arn}/*"]
+        },
       ]
       app_security_group_id = aws_security_group.background_worker.id
       target_group_arn      = null
-      desired_count         = null
+      # Raised from 1 as part of the Saga Persistence spec -- proof that InventoryItem's
+      # Mongo-backed persistence actually unblocks multi-instance operation, not just that the
+      # config now allows it. See docs/plans/saga-persistence-plan.md task 21.
+      desired_count = 2
       environment_variables = [
         { name = "Sqs__CoordinatorInboundQueueUrl", value = module.orchestration_messaging.coordinator_inbound_queue_url },
         { name = "Sqs__InventoryCommandsQueueUrl", value = module.orchestration_messaging.inventory_commands_queue_url },
         { name = "Dynamo__IdempotencyTableName", value = module.idempotency.table_name },
+        { name = "Mongo__ConnectionString", value = module.persistence.connection_string },
+        { name = "Mongo__DatabaseName", value = "orchestration" },
+        { name = "Mongo__InventoryEventsCollectionName", value = "inventory-events" },
+        { name = "S3__ArchiveBucketName", value = module.persistence.archive_bucket_name },
       ]
     }
     responder = {

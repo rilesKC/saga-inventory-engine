@@ -13,15 +13,19 @@ namespace OrderSaga.Choreography.Host.Tests;
 /// </summary>
 public class HostParticipantWiringTests
 {
-    private static Dictionary<string, InventoryItem> Items(string sku, int quantity) =>
-        new() { [sku] = InventoryItem.Seed(sku, quantity) };
+    private static async Task<InMemoryInventoryEventStore> SeedAsync(string sku, int quantity)
+    {
+        var eventStore = new InMemoryInventoryEventStore();
+        await eventStore.AppendRangeAsync(sku, 0, [new StockSeeded(sku, quantity)], CancellationToken.None);
+        return eventStore;
+    }
 
     [Fact]
-    public void Wire_OrderPlacedOnInbound_PublishesStockReservedOnOutboundOnly()
+    public async Task Wire_OrderPlacedOnInbound_PublishesStockReservedOnOutboundOnly()
     {
         var inboundRaw = new EventBus();
         var outboundRaw = new EventBus();
-        HostParticipantWiring.Wire(new InboundEventBus(inboundRaw), new OutboundEventBus(outboundRaw), Items("SKU-1", 10), paymentDeclineThreshold: 500m);
+        HostParticipantWiring.Wire(new InboundEventBus(inboundRaw), new OutboundEventBus(outboundRaw), paymentDeclineThreshold: 500m, await SeedAsync("SKU-1", 10));
         StockReserved? onOutbound = null;
         outboundRaw.Subscribe<StockReserved>(e => onOutbound = e);
         var leakedToInbound = false;
@@ -35,18 +39,18 @@ public class HostParticipantWiringTests
     }
 
     [Fact]
-    public void Wire_StockReservedOnInbound_PublishesPaymentChargedOnOutboundOnly()
+    public async Task Wire_StockReservedOnInbound_PublishesPaymentChargedOnOutboundOnly()
     {
         var inboundRaw = new EventBus();
         var outboundRaw = new EventBus();
-        HostParticipantWiring.Wire(new InboundEventBus(inboundRaw), new OutboundEventBus(outboundRaw), Items("SKU-1", 10), paymentDeclineThreshold: 500m);
+        HostParticipantWiring.Wire(new InboundEventBus(inboundRaw), new OutboundEventBus(outboundRaw), paymentDeclineThreshold: 500m, await SeedAsync("SKU-1", 10));
         PaymentCharged? onOutbound = null;
         outboundRaw.Subscribe<PaymentCharged>(e => onOutbound = e);
         var leakedToInbound = false;
         inboundRaw.Subscribe<PaymentCharged>(_ => leakedToInbound = true);
         inboundRaw.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
 
-        inboundRaw.Publish(new StockReserved("SKU-1", "ORDER-1", 4));
+        inboundRaw.Publish(new StockReserved("SKU-1", "ORDER-1", 4, 199.99m));
 
         Assert.NotNull(onOutbound);
         Assert.Equal("ORDER-1", onOutbound.OrderId);
@@ -54,11 +58,11 @@ public class HostParticipantWiringTests
     }
 
     [Fact]
-    public void Wire_ReservationConfirmedOnInbound_PublishesShipmentScheduledOnOutboundOnly()
+    public async Task Wire_ReservationConfirmedOnInbound_PublishesShipmentScheduledOnOutboundOnly()
     {
         var inboundRaw = new EventBus();
         var outboundRaw = new EventBus();
-        HostParticipantWiring.Wire(new InboundEventBus(inboundRaw), new OutboundEventBus(outboundRaw), Items("SKU-1", 10), paymentDeclineThreshold: 500m);
+        HostParticipantWiring.Wire(new InboundEventBus(inboundRaw), new OutboundEventBus(outboundRaw), paymentDeclineThreshold: 500m, await SeedAsync("SKU-1", 10));
         ShipmentScheduled? onOutbound = null;
         outboundRaw.Subscribe<ShipmentScheduled>(e => onOutbound = e);
         var leakedToInbound = false;

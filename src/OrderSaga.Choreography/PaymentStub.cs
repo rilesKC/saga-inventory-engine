@@ -8,7 +8,6 @@ public sealed class PaymentStub
     private readonly InboundEventBus _inbound;
     private readonly OutboundEventBus _outbound;
     private readonly decimal _threshold;
-    private readonly Dictionary<string, decimal> _amountsByOrderId = [];
 
     /// <param name="inbound">Subscribed to for trigger events.</param>
     /// <param name="outbound">Published to for produced events. See
@@ -18,18 +17,12 @@ public sealed class PaymentStub
         _inbound = inbound;
         _outbound = outbound;
         _threshold = threshold;
-        _inbound.Subscribe<OrderPlaced>(OnOrderPlaced);
         _inbound.Subscribe<StockReserved>(OnStockReserved);
-    }
-
-    private void OnOrderPlaced(OrderPlaced orderPlaced)
-    {
-        _amountsByOrderId[orderPlaced.OrderId] = orderPlaced.Amount;
     }
 
     private void OnStockReserved(StockReserved stockReserved)
     {
-        var amount = _amountsByOrderId[stockReserved.OrderId];
+        var amount = stockReserved.Amount;
 
         if (amount > _threshold)
         {

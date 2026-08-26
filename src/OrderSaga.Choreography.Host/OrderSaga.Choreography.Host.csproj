@@ -11,12 +11,15 @@
     <ProjectReference Include="..\OrderSaga.Shared\OrderSaga.Shared.csproj" />
     <ProjectReference Include="..\OrderSaga.Choreography\OrderSaga.Choreography.csproj" />
     <ProjectReference Include="..\OrderSaga.Aws\OrderSaga.Aws.csproj" />
+    <ProjectReference Include="..\Saga.Persistence\Saga.Persistence.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="AWSSDK.DynamoDBv2" Version="4.0.103.4" />
     <PackageReference Include="AWSSDK.EventBridge" Version="4.0.100.10" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.102.4" />
     <PackageReference Include="AWSSDK.SQS" Version="4.0.100.10" />
+    <PackageReference Include="MongoDB.Driver" Version="3.11.0" />
   </ItemGroup>
 
 </Project>

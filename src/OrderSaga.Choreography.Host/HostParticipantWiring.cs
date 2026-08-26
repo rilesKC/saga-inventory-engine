@@ -15,10 +15,10 @@ public static class HostParticipantWiring
     public static void Wire(
         InboundEventBus inbound,
         OutboundEventBus outbound,
-        Dictionary<string, InventoryItem> items,
-        decimal paymentDeclineThreshold)
+        decimal paymentDeclineThreshold,
+        IInventoryEventStore eventStore)
     {
-        _ = new InventoryParticipant(inbound, outbound, items);
+        _ = new InventoryParticipant(inbound, outbound, eventStore);
         _ = new PaymentStub(inbound, outbound, paymentDeclineThreshold);
         _ = new ShippingStub(inbound, outbound);
     }

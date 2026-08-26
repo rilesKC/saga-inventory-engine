@@ -10,6 +10,8 @@ COPY ["src/OrderSaga.Orchestration.Messaging/OrderSaga.Orchestration.Messaging.c
 COPY ["src/OrderSaga.Orchestration/OrderSaga.Orchestration.csproj", "src/OrderSaga.Orchestration/"]
 COPY ["src/OrderSaga.Shared/OrderSaga.Shared.csproj", "src/OrderSaga.Shared/"]
 COPY ["src/Inventory.Domain/Inventory.Domain.csproj", "src/Inventory.Domain/"]
+COPY ["src/OrderSaga.Aws/OrderSaga.Aws.csproj", "src/OrderSaga.Aws/"]
+COPY ["src/Saga.Persistence/Saga.Persistence.csproj", "src/Saga.Persistence/"]
 RUN dotnet restore "src/OrderSaga.Orchestration.InventoryHost/OrderSaga.Orchestration.InventoryHost.csproj"
 
 COPY src/OrderSaga.Orchestration.InventoryHost/ src/OrderSaga.Orchestration.InventoryHost/
@@ -17,6 +19,8 @@ COPY src/OrderSaga.Orchestration.Messaging/ src/OrderSaga.Orchestration.Messagin
 COPY src/OrderSaga.Orchestration/ src/OrderSaga.Orchestration/
 COPY src/OrderSaga.Shared/ src/OrderSaga.Shared/
 COPY src/Inventory.Domain/ src/Inventory.Domain/
+COPY src/OrderSaga.Aws/ src/OrderSaga.Aws/
+COPY src/Saga.Persistence/ src/Saga.Persistence/
 
 WORKDIR /src/src/OrderSaga.Orchestration.InventoryHost
 RUN dotnet publish "OrderSaga.Orchestration.InventoryHost.csproj" -c Release -o /app/publish --no-restore

@@ -7,7 +7,7 @@ public sealed class InventoryParticipant
 {
     private readonly InboundEventBus _inbound;
     private readonly OutboundEventBus _outbound;
-    private readonly Dictionary<string, InventoryItem> _items;
+    private readonly IInventoryEventStore _eventStore;
 
     /// <param name="inbound">Subscribed to for trigger events.</param>
     /// <param name="outbound">Published to for produced events. In-process choreography (this
@@ -19,11 +19,16 @@ public sealed class InventoryParticipant
     /// round-trip, not an in-process shortcut. InboundEventBus/OutboundEventBus being distinct
     /// types (rather than both just EventBus) means the compiler catches the two parameters being
     /// swapped -- an unbounded republish loop was caused by exactly that shape of bug once already.</param>
-    public InventoryParticipant(InboundEventBus inbound, OutboundEventBus outbound, Dictionary<string, InventoryItem> items)
+    /// <param name="eventStore">Durable, shared source of truth for this SKU's InventoryItem --
+    /// every command reloads the latest state from here immediately before mutating it (see
+    /// ApplyWithRetry), rather than mutating one cached in-memory object. That reload is what makes
+    /// desired_count >= 2 safe: two concurrently-running Host instances no longer each hold their
+    /// own drifting copy of InventoryItem.</param>
+    public InventoryParticipant(InboundEventBus inbound, OutboundEventBus outbound, IInventoryEventStore eventStore)
     {
         _inbound = inbound;
         _outbound = outbound;
-        _items = items;
+        _eventStore = eventStore;
         _inbound.Subscribe<OrderPlaced>(OnOrderPlaced);
         _inbound.Subscribe<PaymentCharged>(OnPaymentCharged);
         _inbound.Subscribe<PaymentDeclined>(OnPaymentDeclined);
@@ -31,47 +36,61 @@ public sealed class InventoryParticipant
 
     private void OnOrderPlaced(OrderPlaced orderPlaced)
     {
-        var item = _items[orderPlaced.Sku];
-        var eventCountBefore = item.UncommittedEvents.Count;
-
         try
         {
-            item.Handle(new ReserveStock(orderPlaced.Sku, orderPlaced.OrderId, orderPlaced.Quantity));
+            ApplyWithRetry(orderPlaced.Sku, item =>
+                item.Handle(new ReserveStock(orderPlaced.Sku, orderPlaced.OrderId, orderPlaced.Quantity, orderPlaced.Amount)));
         }
         catch (InsufficientStockException)
         {
             _outbound.Publish(new StockReservationFailed(orderPlaced.OrderId, orderPlaced.Sku));
-            return;
         }
-
-        PublishNewEvents(item, eventCountBefore);
     }
 
-    private void OnPaymentCharged(PaymentCharged paymentCharged)
+    private void OnPaymentCharged(PaymentCharged paymentCharged) =>
+        ApplyWithRetry(paymentCharged.Sku, item =>
+            item.Handle(new ConfirmReservation(paymentCharged.Sku, paymentCharged.OrderId)));
+
+    private void OnPaymentDeclined(PaymentDeclined paymentDeclined) =>
+        ApplyWithRetry(paymentDeclined.Sku, item =>
+            item.Handle(new ReleaseReservation(paymentDeclined.Sku, paymentDeclined.OrderId)));
+
+    /// <summary>
+    /// Reloads InventoryItem from the durable event log, applies the mutation, and appends the
+    /// resulting new event(s) guarded by optimistic concurrency -- retrying from a fresh reload if
+    /// a concurrent writer (the other Host instance) already appended first. mutate is expected to
+    /// throw for a domain-level rejection (e.g. InsufficientStockException); that propagates to the
+    /// caller unchanged, without appending or publishing anything.
+    /// </summary>
+    private void ApplyWithRetry(string sku, Action<InventoryItem> mutate)
     {
-        var item = _items[paymentCharged.Sku];
-        var eventCountBefore = item.UncommittedEvents.Count;
-
-        item.Handle(new ConfirmReservation(paymentCharged.Sku, paymentCharged.OrderId));
-
-        PublishNewEvents(item, eventCountBefore);
-    }
-
-    private void OnPaymentDeclined(PaymentDeclined paymentDeclined)
-    {
-        var item = _items[paymentDeclined.Sku];
-        var eventCountBefore = item.UncommittedEvents.Count;
-
-        item.Handle(new ReleaseReservation(paymentDeclined.Sku, paymentDeclined.OrderId));
-
-        PublishNewEvents(item, eventCountBefore);
-    }
-
-    private void PublishNewEvents(InventoryItem item, int eventCountBefore)
-    {
-        for (var i = eventCountBefore; i < item.UncommittedEvents.Count; i++)
+        while (true)
         {
-            _outbound.Publish(item.UncommittedEvents[i]);
+            var history = _eventStore.LoadEventsAsync(sku, CancellationToken.None).GetAwaiter().GetResult();
+            var item = InventoryItem.LoadFromHistory(history);
+
+            mutate(item);
+
+            if (item.UncommittedEvents.Count == 0)
+            {
+                return;
+            }
+
+            try
+            {
+                _eventStore.AppendRangeAsync(sku, history.Count, item.UncommittedEvents, CancellationToken.None).GetAwaiter().GetResult();
+            }
+            catch (ConcurrencyConflictException)
+            {
+                continue;
+            }
+
+            foreach (var @event in item.UncommittedEvents)
+            {
+                _outbound.Publish(@event);
+            }
+
+            return;
         }
     }
 }

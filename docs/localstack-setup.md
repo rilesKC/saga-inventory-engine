@@ -28,7 +28,7 @@ LocalStack itself is fine — check its actual health endpoint instead):
 curl -s http://localhost:4566/_localstack/health
 ```
 
-Confirm `sqs`, `dynamodb`, `events`, `iam`, and `sts` all show `"available"`.
+Confirm `sqs`, `dynamodb`, `events`, `iam`, `sts`, and `s3` all show `"available"`.
 
 ## Applying Terraform against it
 
@@ -84,6 +84,24 @@ curl -s -X POST http://localhost:4566/ \
 
 A healthy happy-path run produces exactly 5 claims (`OrderPlaced`, `StockReserved`,
 `PaymentCharged`, `ReservationConfirmed`, `ShipmentScheduled`) and an empty queue/DLQ afterward.
+
+## S3 event archive (standalone, not through the full Host)
+
+MongoDB Atlas isn't an AWS service, so LocalStack can't emulate the live Mongo store the full Host
+needs — only the S3 archive side of persistence is worth validating here (see
+`docs/specs/saga-persistence.md`); the Mongo-backed path is only exercisable against the real Atlas
+cluster (see the Saga Persistence plan's real-deployment task). Apply just the bucket:
+
+```bash
+AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test terraform apply -auto-approve \
+  -target='module.persistence.aws_s3_bucket.archive' \
+  -target='module.persistence.aws_s3_bucket_public_access_block.archive' \
+  -var="localstack_endpoint=http://localhost:4566"
+```
+
+Then exercise `S3EventArchiveWriter` directly (a small standalone `dotnet run`, not the full Host)
+against `order-saga-choreography-event-archive`, and confirm the object landed via a plain `curl`
+against the bucket — no AWS CLI needed, same precedent as the SQS/DynamoDB checks above.
 
 ## Cleaning up
 

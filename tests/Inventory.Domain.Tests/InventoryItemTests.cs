@@ -26,13 +26,14 @@ public class InventoryItemTests
     {
         var item = InventoryItem.Seed("SKU-1", 10);
 
-        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4, 199.99m));
 
         Assert.Equal(6, item.AvailableQuantity);
         var stockReserved = Assert.IsType<StockReserved>(item.UncommittedEvents[^1]);
         Assert.Equal("SKU-1", stockReserved.Sku);
         Assert.Equal("ORDER-1", stockReserved.OrderId);
         Assert.Equal(4, stockReserved.Quantity);
+        Assert.Equal(199.99m, stockReserved.Amount);
     }
 
     [Fact]
@@ -41,7 +42,7 @@ public class InventoryItemTests
         var item = InventoryItem.Seed("SKU-1", 10);
 
         Assert.Throws<InsufficientStockException>(() =>
-            item.Handle(new ReserveStock("SKU-1", "ORDER-1", 11)));
+            item.Handle(new ReserveStock("SKU-1", "ORDER-1", 11, 199.99m)));
 
         Assert.Equal(10, item.AvailableQuantity);
         Assert.Single(item.UncommittedEvents);
@@ -51,9 +52,9 @@ public class InventoryItemTests
     public void ReserveStock_DuplicateForSameOrderAndSku_ReturnsExistingReservationWithoutReducingAvailableAgain()
     {
         var item = InventoryItem.Seed("SKU-1", 10);
-        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4, 199.99m));
 
-        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4, 199.99m));
 
         Assert.Equal(6, item.AvailableQuantity);
         Assert.Equal(2, item.UncommittedEvents.Count);
@@ -63,7 +64,7 @@ public class InventoryItemTests
     public void ConfirmReservation_OnReservedHold_EmitsReservationConfirmedAndMovesQuantityToDeducted()
     {
         var item = InventoryItem.Seed("SKU-1", 10);
-        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4, 199.99m));
 
         item.Handle(new ConfirmReservation("SKU-1", "ORDER-1"));
 
@@ -80,7 +81,7 @@ public class InventoryItemTests
     public void ReleaseReservation_OnReservedHold_EmitsReservationReleasedAndRestoresAvailableQuantity()
     {
         var item = InventoryItem.Seed("SKU-1", 10);
-        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4, 199.99m));
 
         item.Handle(new ReleaseReservation("SKU-1", "ORDER-1"));
 
@@ -96,7 +97,7 @@ public class InventoryItemTests
     public void ConfirmReservation_AlreadyReleased_ThrowsInvalidReservationStateException()
     {
         var item = InventoryItem.Seed("SKU-1", 10);
-        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4, 199.99m));
         item.Handle(new ReleaseReservation("SKU-1", "ORDER-1"));
 
         Assert.Throws<InvalidReservationStateException>(() =>
@@ -107,7 +108,7 @@ public class InventoryItemTests
     public void ReleaseReservation_AlreadyConfirmed_ThrowsInvalidReservationStateException()
     {
         var item = InventoryItem.Seed("SKU-1", 10);
-        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4, 199.99m));
         item.Handle(new ConfirmReservation("SKU-1", "ORDER-1"));
 
         Assert.Throws<InvalidReservationStateException>(() =>
@@ -118,7 +119,7 @@ public class InventoryItemTests
     public void LoadFromHistory_ReplayingAFullLifecycle_ReconstructsTheSameStateAsLiveMethodCalls()
     {
         var live = InventoryItem.Seed("SKU-1", 10);
-        live.Handle(new ReserveStock("SKU-1", "ORDER-1", 4));
+        live.Handle(new ReserveStock("SKU-1", "ORDER-1", 4, 199.99m));
         live.Handle(new ConfirmReservation("SKU-1", "ORDER-1"));
 
         var replayed = InventoryItem.LoadFromHistory(live.UncommittedEvents);

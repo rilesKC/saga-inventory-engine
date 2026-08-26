@@ -12,4 +12,4 @@ public enum SagaStep
     Failed,
 }
 
-public sealed record SagaState(string OrderId, string Sku, int Quantity, decimal Amount, SagaStep Step);
+public sealed record SagaState(string OrderId, string Sku, int Quantity, decimal Amount, SagaStep Step, int Version = 0);

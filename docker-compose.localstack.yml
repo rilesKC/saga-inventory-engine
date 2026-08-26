@@ -4,6 +4,6 @@ services:
     ports:
       - "4566:4566"
     environment:
-      - SERVICES=sqs,dynamodb,events,sts,iam
+      - SERVICES=sqs,dynamodb,events,sts,iam,s3
       - DEBUG=0
       - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN}

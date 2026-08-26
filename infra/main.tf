@@ -21,6 +21,16 @@ module "idempotency" {
   # DynamoDbIdempotencyStore's hardcoded TableName constant exactly.
 }
 
+module "persistence" {
+  source = "./modules/persistence"
+
+  atlas_org_id        = var.atlas_org_id
+  project_name        = "${var.name}-persistence"
+  database_name       = "inventory"
+  nat_gateway_ip      = module.networking.nat_gateway_ip
+  archive_bucket_name = "${var.name}-event-archive"
+}
+
 module "iam_and_observability" {
   source = "./modules/iam-and-observability"
 
@@ -28,7 +38,8 @@ module "iam_and_observability" {
   task_policy_statements = [
     { actions = ["events:PutEvents"], resources = [module.messaging.event_bus_arn] },
     { actions = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"], resources = [module.messaging.queue_arn] },
-    { actions = ["dynamodb:PutItem"], resources = [module.idempotency.table_arn] },
+    { actions = ["dynamodb:PutItem", "dynamodb:DeleteItem"], resources = [module.idempotency.table_arn] },
+    { actions = ["s3:PutObject"], resources = ["${module.persistence.archive_bucket_arn}/*"] },
   ]
 }
 
@@ -53,9 +64,19 @@ module "compute" {
   ecr_repository_url      = module.iam_and_observability.ecr_repository_url
   image_tag               = var.image_tag
   log_group_name          = module.iam_and_observability.log_group_name
+
+  # desired_count raised from the default 1 to 2 as part of the Saga Persistence spec -- proof
+  # that InventoryItem's Mongo-backed persistence actually unblocks multi-instance operation, not
+  # just that the config now allows it. See docs/plans/saga-persistence-plan.md task 21.
+  desired_count = 2
+
   environment_variables = [
     { name = "Sqs__QueueUrl", value = module.messaging.queue_url },
     { name = "EventBridge__BusName", value = module.messaging.event_bus_name },
+    { name = "Mongo__ConnectionString", value = module.persistence.connection_string },
+    { name = "Mongo__DatabaseName", value = "inventory" },
+    { name = "Mongo__InventoryEventsCollectionName", value = "events" },
+    { name = "S3__ArchiveBucketName", value = module.persistence.archive_bucket_name },
   ]
 
   # Real resource/module reference, unlike the string-ARN attempt task 17's retro flagged --
