@@ -39,6 +39,15 @@ either. See `docs/specs/` and `docs/plans/` for each piece's spec and task break
 [docs/choreography-vs-orchestration.md](docs/choreography-vs-orchestration.md) for what deploying
 both actually showed, not just building both.
 
+Both stacks now persist real state too: `InventoryItem` (event-sourced) and `SagaState`
+(snapshotted) are durably written to a MongoDB Atlas cluster per stack, with a best-effort S3
+archive of every event/state write, replacing the earlier in-memory-only implementation. Both
+`desired_count`s were raised to 2+ and validated for real — multi-instance concurrency and
+crash-recovery mid-saga, not just the single-instance happy path — then torn down. See
+[docs/specs/saga-persistence.md](docs/specs/saga-persistence.md) /
+[docs/plans/saga-persistence-plan.md](docs/plans/saga-persistence-plan.md) for the design and what
+that real deployment found.
+
 ## Development process
 
 This project uses a spec-first pipeline: `/brainstorm` → `/plan` → test-first implementation →

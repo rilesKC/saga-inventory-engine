@@ -170,4 +170,46 @@ old task's background poller actually stops. That's not a new bug; it's the alre
 `SagaState`-isn't-persisted gap (see "Out of Scope" in `docs/specs/orchestration-aws-infra.md`)
 showing up live during a deploy instead of only in a design doc. The DLQ-backed retry pattern
 absorbed it exactly as designed — both affected messages landed in the DLQ rather than being
-silently lost or double-processed.
+silently lost or double-processed. (This gap has since been closed — see "Now that persistence is
+real too" below.)
+
+## Now that persistence is real too
+
+The `SagaState`-isn't-persisted gap named above (and in `docs/specs/orchestration-aws-infra.md`'s
+"Out of Scope") has since been closed for both `InventoryItem` and `SagaState` — see
+`docs/specs/saga-persistence.md` / `docs/plans/saga-persistence-plan.md`. A few things that real
+persistence work surfaced, beyond just "state now survives a restart":
+
+### Persisting state didn't make multi-instance safe by itself
+
+The original assumption was that adding a durable store would be enough to raise both stacks'
+`desired_count` above 1. It wasn't: `InventoryParticipant`/`InventoryResponder`/`SagaCoordinator`
+were each still mutating one long-lived in-memory object per process, loaded once at startup —
+Mongo made that survive a *restart*, but two *simultaneously running* instances never re-synced
+with each other. The actual fix was optimistic concurrency (an expected-version check on every
+write, retried on conflict), not just "write to Mongo instead of a `List`."
+
+### The same concurrency bug recurred three times in three different classes
+
+Found once in `InventoryParticipant`/`InventoryResponder`, then proactively in `SagaCoordinator`
+(caught by code inspection before it failed live), then a third time in choreography's
+`PaymentStub`, which cached `Amount` from `OrderPlaced` in a plain dictionary — the same
+"per-process cache breaks under `desired_count >= 2`" bug shape, just in a component the
+persistence plan hadn't touched at all since it has no store of its own.
+
+### A namespace collision silently defeated the fix for one of the three
+
+`InventoryResponder`'s retry loop lived in the same C# namespace as a second, identically-named
+`ConcurrencyConflictException` (added for `SagaCoordinator`'s own store) — its `catch` clause
+silently bound to the wrong type, and the regression test written to prove the retry worked had
+the identical bug in its own fake, so it passed while testing nothing real. Only caught by a
+dedicated code review after the real deployment, not by any of the tests or the live validation
+pass itself.
+
+### Real AWS/Atlas deployment found bugs no unit test or LocalStack could
+
+LocalStack doesn't run MongoDB (Atlas isn't an AWS service), so none of this session's
+concurrency, index-contamination, or Mongo-serialization bugs was ever visible until the real
+deployment — including one genuine live outage (the coordinator crash-looping on every restart
+once real `SagaState` data existed, from deserializing Mongo's own auto-generated `_id` field into
+a type with no property for it), caught and fixed within the same deployment window.
