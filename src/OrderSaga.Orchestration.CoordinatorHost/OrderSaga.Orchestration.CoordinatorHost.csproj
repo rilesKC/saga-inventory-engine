@@ -10,6 +10,7 @@
     <ProjectReference Include="..\OrderSaga.Shared\OrderSaga.Shared.csproj" />
     <ProjectReference Include="..\OrderSaga.Orchestration\OrderSaga.Orchestration.csproj" />
     <ProjectReference Include="..\OrderSaga.Orchestration.Messaging\OrderSaga.Orchestration.Messaging.csproj" />
+    <ProjectReference Include="..\Saga.Persistence\Saga.Persistence.csproj" />
   </ItemGroup>
 
 </Project>

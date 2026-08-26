@@ -11,6 +11,6 @@ namespace OrderSaga.Orchestration.CoordinatorHost;
 /// </summary>
 public static class CoordinatorWiring
 {
-    public static SagaCoordinator Wire(InboundEventBus inbound, OutboundEventBus outbound) =>
-        new(inbound, outbound);
+    public static SagaCoordinator Wire(InboundEventBus inbound, OutboundEventBus outbound, ISagaStateStore store) =>
+        new(inbound, outbound, store);
 }

@@ -75,7 +75,7 @@ public sealed class InventoryItem
             throw new InsufficientStockException(command.Sku, command.Quantity, AvailableQuantity);
         }
 
-        var stockReserved = new StockReserved(command.Sku, command.OrderId, command.Quantity);
+        var stockReserved = new StockReserved(command.Sku, command.OrderId, command.Quantity, command.Amount);
         Apply(stockReserved);
         _uncommittedEvents.Add(stockReserved);
     }

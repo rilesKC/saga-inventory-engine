@@ -10,6 +10,7 @@
     <Project Path="src/OrderSaga.Orchestration.Messaging/OrderSaga.Orchestration.Messaging.csproj" />
     <Project Path="src/OrderSaga.Orchestration.ResponderHost/OrderSaga.Orchestration.ResponderHost.csproj" />
     <Project Path="src/OrderSaga.Shared/OrderSaga.Shared.csproj" />
+    <Project Path="src/Saga.Persistence/Saga.Persistence.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Inventory.Domain.Tests/Inventory.Domain.Tests.csproj" />
@@ -22,5 +23,6 @@
     <Project Path="tests/OrderSaga.Orchestration.ResponderHost.Tests/OrderSaga.Orchestration.ResponderHost.Tests.csproj" />
     <Project Path="tests/OrderSaga.Orchestration.Messaging.Tests/OrderSaga.Orchestration.Messaging.Tests.csproj" />
     <Project Path="tests/OrderSaga.Shared.Tests/OrderSaga.Shared.Tests.csproj" />
+    <Project Path="tests/Saga.Persistence.Tests/Saga.Persistence.Tests.csproj" />
   </Folder>
 </Solution>

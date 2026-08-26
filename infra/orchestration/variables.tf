@@ -39,3 +39,8 @@ variable "localstack_endpoint" {
   type        = string
   default     = ""
 }
+
+variable "atlas_org_id" {
+  description = "MongoDB Atlas organization ID -- see MONGODB_ATLAS_ORG_ID in the repo's gitignored .env."
+  type        = string
+}

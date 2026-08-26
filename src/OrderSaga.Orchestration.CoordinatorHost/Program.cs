@@ -1,9 +1,13 @@
 using Amazon.DynamoDBv2;
+using Amazon.S3;
 using Amazon.SQS;
+using MongoDB.Driver;
 using OrderSaga.Aws;
+using OrderSaga.Orchestration;
 using OrderSaga.Orchestration.CoordinatorHost;
 using OrderSaga.Orchestration.Messaging;
 using OrderSaga.Shared;
+using Saga.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +17,7 @@ var localStackServiceUrl = builder.Configuration["Aws:ServiceUrl"];
 
 builder.Services.AddSingleton<IAmazonSQS>(_ => AwsClientFactory.CreateSqsClient(localStackServiceUrl));
 builder.Services.AddSingleton<IAmazonDynamoDB>(_ => AwsClientFactory.CreateDynamoDbClient(localStackServiceUrl));
+builder.Services.AddSingleton<IAmazonS3>(_ => AwsClientFactory.CreateS3Client(localStackServiceUrl));
 
 var idempotencyTableName = builder.Configuration["Dynamo:IdempotencyTableName"]
     ?? throw new InvalidOperationException("Configuration value 'Dynamo:IdempotencyTableName' is required.");
@@ -33,8 +38,6 @@ var coordinatorInboundQueueUrl = builder.Configuration["Sqs:CoordinatorInboundQu
 // fixed for.
 var inboundBus = new EventBus();
 var outboundBus = new EventBus();
-
-_ = CoordinatorWiring.Wire(new InboundEventBus(inboundBus), new OutboundEventBus(outboundBus));
 
 builder.Services.AddSingleton(sp => new SqsMessageProcessor(inboundBus, sp.GetRequiredService<IIdempotencyStore>()));
 builder.Services.AddHostedService(sp => new SqsPollingBackgroundService(
@@ -61,6 +64,28 @@ builder.Services.AddSingleton(sp => new OutboundMessageForwarder(outboundBus, sp
 builder.Services.AddSingleton(sp => new OrderIntakeHandler(sp.GetRequiredKeyedService<IMessagePublisher>("coordinator-inbound")));
 
 var app = builder.Build();
+
+// Mongo is the live SagaState snapshot store; S3 is a best-effort secondary archive -- see
+// docs/specs/saga-persistence.md. Same Mongo cluster/database as the Inventory responder's
+// InventoryHost, a different collection (SagaState isn't event-sourced, so it doesn't share
+// InventoryItem's append-only shape). Config-driven so this stack's values never collide with
+// choreography's separate ones.
+var mongoConnectionString = builder.Configuration["Mongo:ConnectionString"]
+    ?? throw new InvalidOperationException("Configuration value 'Mongo:ConnectionString' is required.");
+var mongoDatabaseName = builder.Configuration["Mongo:DatabaseName"]
+    ?? throw new InvalidOperationException("Configuration value 'Mongo:DatabaseName' is required.");
+var sagaStateCollectionName = builder.Configuration["Mongo:SagaStateCollectionName"]
+    ?? throw new InvalidOperationException("Configuration value 'Mongo:SagaStateCollectionName' is required.");
+var archiveBucketName = builder.Configuration["S3:ArchiveBucketName"]
+    ?? throw new InvalidOperationException("Configuration value 'S3:ArchiveBucketName' is required.");
+
+var mongoDatabase = new MongoClient(mongoConnectionString).GetDatabase(mongoDatabaseName);
+var sagaStateStore = new S3ArchivingSagaStateStore(
+    new MongoSagaStateStore(mongoDatabase, sagaStateCollectionName),
+    new S3EventArchiveWriter(app.Services.GetRequiredService<IAmazonS3>(), archiveBucketName),
+    app.Services.GetRequiredService<ILogger<S3ArchivingSagaStateStore>>());
+
+_ = CoordinatorWiring.Wire(new InboundEventBus(inboundBus), new OutboundEventBus(outboundBus), sagaStateStore);
 
 // Eagerly resolve the forwarder so its EventBus subscription is wired up before any command reply
 // arrives -- it's never otherwise resolved from the container, since nothing calls its methods

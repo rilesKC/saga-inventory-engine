@@ -8,7 +8,7 @@ public class InventoryProjectionTests
         var projection = new InventoryProjection();
 
         projection.Apply(new StockSeeded("SKU-1", 10));
-        projection.Apply(new StockReserved("SKU-1", "ORDER-1", 4));
+        projection.Apply(new StockReserved("SKU-1", "ORDER-1", 4, 199.99m));
 
         Assert.Equal(6, projection.GetAvailableQuantity("SKU-1"));
     }
@@ -18,7 +18,7 @@ public class InventoryProjectionTests
     {
         var projection = new InventoryProjection();
         projection.Apply(new StockSeeded("SKU-1", 10));
-        projection.Apply(new StockReserved("SKU-1", "ORDER-1", 4));
+        projection.Apply(new StockReserved("SKU-1", "ORDER-1", 4, 199.99m));
 
         projection.Apply(new ReservationReleased("SKU-1", "ORDER-1", 4));
 
@@ -30,7 +30,7 @@ public class InventoryProjectionTests
     {
         var projection = new InventoryProjection();
         projection.Apply(new StockSeeded("SKU-1", 10));
-        projection.Apply(new StockReserved("SKU-1", "ORDER-1", 4));
+        projection.Apply(new StockReserved("SKU-1", "ORDER-1", 4, 199.99m));
 
         projection.Apply(new ReservationConfirmed("SKU-1", "ORDER-1", 4));
 

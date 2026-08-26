@@ -12,6 +12,8 @@ COPY ["src/OrderSaga.Shared/OrderSaga.Shared.csproj", "src/OrderSaga.Shared/"]
 # Inventory.Domain isn't referenced by this Host directly -- it's a transitive dependency of
 # OrderSaga.Orchestration (InventoryResponder), needed here purely so that project restores.
 COPY ["src/Inventory.Domain/Inventory.Domain.csproj", "src/Inventory.Domain/"]
+COPY ["src/OrderSaga.Aws/OrderSaga.Aws.csproj", "src/OrderSaga.Aws/"]
+COPY ["src/Saga.Persistence/Saga.Persistence.csproj", "src/Saga.Persistence/"]
 RUN dotnet restore "src/OrderSaga.Orchestration.CoordinatorHost/OrderSaga.Orchestration.CoordinatorHost.csproj"
 
 COPY src/OrderSaga.Orchestration.CoordinatorHost/ src/OrderSaga.Orchestration.CoordinatorHost/
@@ -19,6 +21,8 @@ COPY src/OrderSaga.Orchestration.Messaging/ src/OrderSaga.Orchestration.Messagin
 COPY src/OrderSaga.Orchestration/ src/OrderSaga.Orchestration/
 COPY src/OrderSaga.Shared/ src/OrderSaga.Shared/
 COPY src/Inventory.Domain/ src/Inventory.Domain/
+COPY src/OrderSaga.Aws/ src/OrderSaga.Aws/
+COPY src/Saga.Persistence/ src/Saga.Persistence/
 
 WORKDIR /src/src/OrderSaga.Orchestration.CoordinatorHost
 RUN dotnet publish "OrderSaga.Orchestration.CoordinatorHost.csproj" -c Release -o /app/publish --no-restore

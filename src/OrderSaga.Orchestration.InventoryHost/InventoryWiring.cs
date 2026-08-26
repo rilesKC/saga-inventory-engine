@@ -10,6 +10,6 @@ namespace OrderSaga.Orchestration.InventoryHost;
 /// </summary>
 public static class InventoryWiring
 {
-    public static void Wire(InboundEventBus inbound, OutboundEventBus outbound, Dictionary<string, InventoryItem> items) =>
-        _ = new InventoryResponder(inbound, outbound, items);
+    public static void Wire(InboundEventBus inbound, OutboundEventBus outbound, IInventoryEventStore eventStore) =>
+        _ = new InventoryResponder(inbound, outbound, eventStore);
 }

@@ -10,7 +10,7 @@ public class CoordinatorWiringTests
     {
         var inboundRaw = new EventBus();
         var outboundRaw = new EventBus();
-        var coordinator = CoordinatorWiring.Wire(new InboundEventBus(inboundRaw), new OutboundEventBus(outboundRaw));
+        var coordinator = CoordinatorWiring.Wire(new InboundEventBus(inboundRaw), new OutboundEventBus(outboundRaw), new InMemorySagaStateStore());
         ReserveStockCommand? onOutbound = null;
         outboundRaw.Subscribe<ReserveStockCommand>(e => onOutbound = e);
         var leakedToInbound = false;

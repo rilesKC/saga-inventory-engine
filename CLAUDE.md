@@ -78,6 +78,13 @@ Check off the task's checkbox in the plan file as soon as it passes, before movi
 task — the plan file's checked/unchecked state is what a resumed session should trust, not
 conversation history. Run `/review-task` after each task completes, before moving to the next one.
 
+**`/review-task`'s "Clear to continue" verdict is not a stopping point.** Its own output template
+ends with that verdict line, which makes it look like the natural end of a turn — it isn't. Treat
+it as the cue to immediately write the next unchecked task's failing test, in the same response,
+without asking "want me to continue?" first. This has been a recurring lapse (documented three
+times); the fix is checking this rule at the moment a review's verdict is delivered, not relying on
+recalling it from memory.
+
 ## Explicitly out of scope
 
 Multi-region, a UI, Fargate/CDN polish beyond what's needed to demonstrate the pattern. These are

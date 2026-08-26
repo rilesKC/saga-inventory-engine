@@ -89,6 +89,15 @@ orchestration's command/reply pattern means more hops per step):
   `ChargePaymentCommand`, `PaymentDeclinedReply`, `ReleaseReservationCommand`,
   `ReservationReleasedReply`).
 
+## S3 event archive (standalone, not through the full Hosts)
+
+Same reasoning and pattern as choreography's guide — MongoDB Atlas isn't an AWS service, so only
+the S3 archive side of persistence is validated here, against `order-saga-orchestration-event-archive`
+(one shared bucket for both the Coordinator's `SagaState` and the Inventory responder's
+`InventoryItem` events, per `docs/specs/saga-persistence.md`). Apply just the bucket, then exercise
+`S3EventArchiveWriter` directly via a small standalone `dotnet run` and confirm via `curl`, same as
+choreography's guide.
+
 ## Cleaning up
 
 ```bash

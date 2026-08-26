@@ -8,7 +8,7 @@ public class MessageEnvelopeTests
     [Fact]
     public void Serialize_ReserveStockCommand_ProducesEnvelopeWithTypeMessageIdAndPayload()
     {
-        var command = new ReserveStockCommand("ORDER-1", "SKU-1", 4);
+        var command = new ReserveStockCommand("ORDER-1", "SKU-1", 4, 199.99m);
 
         var envelope = OrchestrationMessageTypeRegistry.Serialize(command);
 
@@ -20,7 +20,7 @@ public class MessageEnvelopeTests
     [Fact]
     public void Deserialize_EnvelopeWithReserveStockCommandType_ReconstructsOriginalCommand()
     {
-        var original = new ReserveStockCommand("ORDER-1", "SKU-1", 4);
+        var original = new ReserveStockCommand("ORDER-1", "SKU-1", 4, 199.99m);
         var envelope = OrchestrationMessageTypeRegistry.Serialize(original);
 
         var reconstructed = OrchestrationMessageTypeRegistry.Deserialize(envelope);
@@ -32,7 +32,7 @@ public class MessageEnvelopeTests
     [Fact]
     public void Serialize_Payload_IsARealJsonObjectNotAnEscapedString()
     {
-        var envelope = OrchestrationMessageTypeRegistry.Serialize(new ReserveStockCommand("ORDER-1", "SKU-1", 4));
+        var envelope = OrchestrationMessageTypeRegistry.Serialize(new ReserveStockCommand("ORDER-1", "SKU-1", 4, 199.99m));
 
         Assert.Equal(JsonValueKind.Object, envelope.Payload.ValueKind);
     }
