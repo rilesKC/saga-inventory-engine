@@ -133,6 +133,21 @@ public class InventoryParticipantTests
         Assert.Equal(3, item.AvailableQuantity);
     }
 
+    [Fact]
+    public async Task OnOrderPlaced_SustainedConflict_RetriesUpToCapThenThrows()
+    {
+        // Under sustained contention (a conflict on every single attempt, not just one), the retry
+        // loop must give up after a bounded number of attempts instead of spinning forever.
+        var bus = new EventBus();
+        var eventStore = new AlwaysConflictingEventStore(await SeedAsync("SKU-1", 10));
+        _ = new InventoryParticipant(new InboundEventBus(bus), new OutboundEventBus(bus), eventStore);
+
+        Assert.Throws<ConcurrencyConflictException>(() =>
+            bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m)));
+
+        Assert.Equal(RetryBackoff.MaxAttempts, eventStore.AttemptsMade);
+    }
+
     /// <summary>
     /// Wraps a real event store; the first AppendRangeAsync call for a given SKU is intercepted to
     /// simulate another writer sneaking in first (appending an unrelated reservation directly, then
@@ -156,6 +171,24 @@ public class InventoryParticipantTests
             }
 
             await inner.AppendRangeAsync(sku, expectedEventCount, events, cancellationToken);
+        }
+
+        public Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken) =>
+            inner.LoadEventsAsync(sku, cancellationToken);
+    }
+
+    /// <summary>
+    /// Simulates sustained contention: every single AppendRangeAsync call throws
+    /// ConcurrencyConflictException, never succeeding, to prove the retry loop is actually bounded.
+    /// </summary>
+    private sealed class AlwaysConflictingEventStore(InMemoryInventoryEventStore inner) : IInventoryEventStore
+    {
+        public int AttemptsMade { get; private set; }
+
+        public Task AppendRangeAsync(string sku, int expectedEventCount, IReadOnlyList<object> events, CancellationToken cancellationToken)
+        {
+            AttemptsMade++;
+            throw new ConcurrencyConflictException(sku, expectedEventCount, expectedEventCount + 1);
         }
 
         public Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken) =>

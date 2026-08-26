@@ -103,11 +103,13 @@ public sealed class SagaCoordinator
     /// guarded by optimistic concurrency -- retrying from a fresh reload if a concurrent writer
     /// (the other Host instance) already saved a newer version first. transition receives the
     /// current state (null only for a brand-new order, i.e. OnOrderPlaced) and returns the new
-    /// state to save.
+    /// state to save. Bounded via RetryBackoff -- under sustained contention (every attempt
+    /// conflicts), the last ConcurrencyConflictException propagates to the caller instead of
+    /// retrying forever.
     /// </summary>
     private SagaState ApplyWithRetry(string orderId, Func<SagaState?, SagaState> transition)
     {
-        while (true)
+        for (var attempt = 1; ; attempt++)
         {
             var current = _store.TryLoadAsync(orderId, CancellationToken.None).GetAwaiter().GetResult();
             var next = transition(current) with { Version = (current?.Version ?? 0) + 1 };
@@ -119,8 +121,9 @@ public sealed class SagaCoordinator
                 // InventoryResponder's own event-store append calls.
                 _store.SaveAsync(next, current?.Version ?? 0, CancellationToken.None).GetAwaiter().GetResult();
             }
-            catch (ConcurrencyConflictException)
+            catch (ConcurrencyConflictException) when (attempt < RetryBackoff.MaxAttempts)
             {
+                RetryBackoff.WaitBeforeRetry(attempt);
                 continue;
             }
 

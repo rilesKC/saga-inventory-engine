@@ -60,11 +60,13 @@ public sealed class InventoryParticipant
     /// resulting new event(s) guarded by optimistic concurrency -- retrying from a fresh reload if
     /// a concurrent writer (the other Host instance) already appended first. mutate is expected to
     /// throw for a domain-level rejection (e.g. InsufficientStockException); that propagates to the
-    /// caller unchanged, without appending or publishing anything.
+    /// caller unchanged, without appending or publishing anything. Bounded via RetryBackoff --
+    /// under sustained contention (every attempt conflicts), the last ConcurrencyConflictException
+    /// propagates to the caller instead of retrying forever.
     /// </summary>
     private void ApplyWithRetry(string sku, Action<InventoryItem> mutate)
     {
-        while (true)
+        for (var attempt = 1; ; attempt++)
         {
             var history = _eventStore.LoadEventsAsync(sku, CancellationToken.None).GetAwaiter().GetResult();
             var item = InventoryItem.LoadFromHistory(history);
@@ -80,8 +82,9 @@ public sealed class InventoryParticipant
             {
                 _eventStore.AppendRangeAsync(sku, history.Count, item.UncommittedEvents, CancellationToken.None).GetAwaiter().GetResult();
             }
-            catch (ConcurrencyConflictException)
+            catch (ConcurrencyConflictException) when (attempt < RetryBackoff.MaxAttempts)
             {
+                RetryBackoff.WaitBeforeRetry(attempt);
                 continue;
             }
 

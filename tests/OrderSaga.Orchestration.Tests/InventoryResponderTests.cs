@@ -151,4 +151,37 @@ public class InventoryResponderTests
         public Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken) =>
             inner.LoadEventsAsync(sku, cancellationToken);
     }
+
+    [Fact]
+    public async Task OnReserveStockCommand_SustainedConflict_RetriesUpToCapThenThrows()
+    {
+        // Under sustained contention (a conflict on every single attempt, not just one), the retry
+        // loop must give up after a bounded number of attempts instead of spinning forever.
+        var bus = new EventBus();
+        var eventStore = new AlwaysConflictingEventStore(await SeedAsync("SKU-1", 10));
+        _ = new InventoryResponder(new InboundEventBus(bus), new OutboundEventBus(bus), eventStore);
+
+        Assert.Throws<Inventory.Domain.ConcurrencyConflictException>(() =>
+            bus.Publish(new ReserveStockCommand("ORDER-1", "SKU-1", 4)));
+
+        Assert.Equal(RetryBackoff.MaxAttempts, eventStore.AttemptsMade);
+    }
+
+    /// <summary>
+    /// Simulates sustained contention: every single AppendRangeAsync call throws
+    /// ConcurrencyConflictException, never succeeding, to prove the retry loop is actually bounded.
+    /// </summary>
+    private sealed class AlwaysConflictingEventStore(InMemoryInventoryEventStore inner) : IInventoryEventStore
+    {
+        public int AttemptsMade { get; private set; }
+
+        public Task AppendRangeAsync(string sku, int expectedEventCount, IReadOnlyList<object> events, CancellationToken cancellationToken)
+        {
+            AttemptsMade++;
+            throw new Inventory.Domain.ConcurrencyConflictException(sku, expectedEventCount, expectedEventCount + 1);
+        }
+
+        public Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken) =>
+            inner.LoadEventsAsync(sku, cancellationToken);
+    }
 }

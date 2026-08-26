@@ -217,4 +217,43 @@ public class SagaCoordinatorTests
         public Task<IReadOnlyList<SagaState>> LoadAllAsync(CancellationToken cancellationToken) =>
             inner.LoadAllAsync(cancellationToken);
     }
+
+    [Fact]
+    public void OnStockReservedReply_SustainedConflict_RetriesUpToCapThenThrows()
+    {
+        // Under sustained contention (a conflict on every single attempt, not just one), the retry
+        // loop must give up after a bounded number of attempts instead of spinning forever.
+        var bus = new EventBus();
+        var store = new AlwaysConflictingSagaStateStore();
+        _ = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus), store);
+
+        Assert.Throws<ConcurrencyConflictException>(() =>
+            bus.Publish(new StockReservedReply("ORDER-1", "SKU-1")));
+
+        Assert.Equal(RetryBackoff.MaxAttempts, store.AttemptsMade);
+    }
+
+    /// <summary>
+    /// Simulates sustained contention: every single SaveAsync call throws
+    /// ConcurrencyConflictException, never succeeding, to prove the retry loop is actually bounded.
+    /// Always reports a persisted SagaState for OnStockReservedReply's own precondition (a saga
+    /// must already exist to transition) so the test exercises the retry cap, not
+    /// SagaNotFoundException.
+    /// </summary>
+    private sealed class AlwaysConflictingSagaStateStore : ISagaStateStore
+    {
+        public int AttemptsMade { get; private set; }
+
+        public Task SaveAsync(SagaState state, int expectedVersion, CancellationToken cancellationToken)
+        {
+            AttemptsMade++;
+            throw new ConcurrencyConflictException(state.OrderId, expectedVersion, expectedVersion + 1);
+        }
+
+        public Task<SagaState?> TryLoadAsync(string orderId, CancellationToken cancellationToken) =>
+            Task.FromResult<SagaState?>(new SagaState(orderId, "SKU-1", 4, 199.99m, SagaStep.ReservingStock, Version: 1));
+
+        public Task<IReadOnlyList<SagaState>> LoadAllAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<SagaState>>([]);
+    }
 }
