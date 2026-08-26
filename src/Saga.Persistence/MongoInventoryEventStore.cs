@@ -18,8 +18,6 @@ namespace Saga.Persistence;
 /// </summary>
 public sealed class MongoInventoryEventStore : IInventoryEventStore
 {
-    private const int DuplicateKeyErrorCode = 11000;
-
     private static readonly Dictionary<string, Type> TypesByName = new()
     {
         [nameof(StockSeeded)] = typeof(StockSeeded),
@@ -57,7 +55,7 @@ public sealed class MongoInventoryEventStore : IInventoryEventStore
         {
             await _collection.InsertManyAsync(documents, cancellationToken: cancellationToken);
         }
-        catch (MongoBulkWriteException<BsonDocument> ex) when (ex.WriteErrors.Any(e => e.Code == DuplicateKeyErrorCode))
+        catch (MongoBulkWriteException<BsonDocument> ex) when (ex.WriteErrors.Any(e => MongoErrors.IsDuplicateKey(e.Category, e.Code)))
         {
             var actualEventCount = (int)await _collection.CountDocumentsAsync(
                 Builders<BsonDocument>.Filter.Eq("Sku", sku), cancellationToken: cancellationToken);

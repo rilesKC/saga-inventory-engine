@@ -20,9 +20,25 @@ namespace Saga.Persistence;
 /// </summary>
 public sealed class MongoSagaStateStore : ISagaStateStore
 {
-    private const int DuplicateKeyErrorCode = 11000;
-
     private readonly IMongoCollection<BsonDocument> _collection;
+
+    // Registers once per process (guarded, since a static constructor already only runs once per
+    // type but this is defensive against re-registration in the same AppDomain regardless). Makes
+    // _id-tolerance a property of SagaState's own Bson mapping everywhere it's ever deserialized
+    // through this driver, not something only this class's own Deserialize method remembers to do
+    // -- a future read path added here (a bulk read, a change-stream projection) that calls
+    // BsonSerializer directly is covered automatically instead of needing its own document.Remove("_id").
+    static MongoSagaStateStore()
+    {
+        if (!BsonClassMap.IsClassMapRegistered(typeof(SagaState)))
+        {
+            BsonClassMap.RegisterClassMap<SagaState>(cm =>
+            {
+                cm.AutoMap();
+                cm.SetIgnoreExtraElements(true);
+            });
+        }
+    }
 
     public MongoSagaStateStore(IMongoDatabase database, string collectionName)
     {
@@ -43,7 +59,7 @@ public sealed class MongoSagaStateStore : ISagaStateStore
         {
             await _collection.ReplaceOneAsync(filter, document, new ReplaceOptions { IsUpsert = true }, cancellationToken);
         }
-        catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey || ex.WriteError?.Code == DuplicateKeyErrorCode)
+        catch (MongoWriteException ex) when (MongoErrors.IsDuplicateKey(ex.WriteError?.Category, ex.WriteError?.Code))
         {
             var actual = await TryLoadAsync(state.OrderId, cancellationToken);
             throw new ConcurrencyConflictException(state.OrderId, expectedVersion, actual?.Version ?? 0);
@@ -66,14 +82,11 @@ public sealed class MongoSagaStateStore : ISagaStateStore
             .ToList();
     }
 
-    // A document read back from the collection carries Mongo's own auto-generated _id, which
-    // SagaState has no property for -- deserializing it unmodified throws FormatException. Stripped
-    // here rather than adding a MongoDB.Bson attribute to SagaState itself, since OrderSaga.Orchestration
-    // has no dependency on MongoDB.Bson (see MongoInventoryEventStore's own Payload-nesting for the
-    // same reasoning applied to Inventory.Domain's events).
-    private static SagaState Deserialize(BsonDocument document)
-    {
-        document.Remove("_id");
-        return BsonSerializer.Deserialize<SagaState>(document);
-    }
+    // The class map registered in the static constructor above makes BsonSerializer tolerate the
+    // Mongo-generated _id every document read back from the collection carries, without SagaState
+    // itself taking on a MongoDB.Bson dependency (OrderSaga.Orchestration has none, deliberately --
+    // see MongoInventoryEventStore's own Payload-nesting for the same reasoning applied to
+    // Inventory.Domain's events).
+    private static SagaState Deserialize(BsonDocument document) =>
+        BsonSerializer.Deserialize<SagaState>(document);
 }
