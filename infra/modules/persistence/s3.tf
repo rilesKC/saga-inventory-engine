@@ -1,5 +1,27 @@
 data "aws_caller_identity" "current" {}
 
+locals {
+  # Deny statement is identical for both buckets except which bucket it protects -- kept as one
+  # template here instead of the same literal JSON copy-pasted into both policies below.
+  deny_insecure_transport_statements = {
+    for key, bucket in {
+      archive      = aws_s3_bucket.archive
+      archive_logs = aws_s3_bucket.archive_logs
+      } : key => {
+      Sid       = "DenyInsecureTransport"
+      Effect    = "Deny"
+      Principal = "*"
+      Action    = "s3:*"
+      Resource  = [bucket.arn, "${bucket.arn}/*"]
+      Condition = {
+        Bool = {
+          "aws:SecureTransport" = "false"
+        }
+      }
+    }
+  }
+}
+
 resource "aws_s3_bucket" "archive" {
   bucket = var.archive_bucket_name
 
@@ -11,43 +33,6 @@ resource "aws_s3_bucket" "archive" {
   tags = {
     Name = var.archive_bucket_name
   }
-}
-
-resource "aws_s3_bucket_public_access_block" "archive" {
-  bucket = aws_s3_bucket.archive.id
-
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-# Denies any request to this bucket that doesn't use TLS, regardless of caller identity or
-# permissions -- SonarCloud flags a bucket with no policy enforcing this (S3 traffic is otherwise
-# allowed over plain HTTP, exposing archived event/saga-state payloads in transit).
-resource "aws_s3_bucket_policy" "archive_https_only" {
-  bucket = aws_s3_bucket.archive.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "DenyInsecureTransport"
-        Effect    = "Deny"
-        Principal = "*"
-        Action    = "s3:*"
-        Resource = [
-          aws_s3_bucket.archive.arn,
-          "${aws_s3_bucket.archive.arn}/*",
-        ]
-        Condition = {
-          Bool = {
-            "aws:SecureTransport" = "false"
-          }
-        }
-      }
-    ]
-  })
 }
 
 # A second bucket is the standard AWS pattern for the log target. It logs to itself (AWS's own
@@ -64,13 +49,30 @@ resource "aws_s3_bucket" "archive_logs" {
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "archive_logs" {
-  bucket = aws_s3_bucket.archive_logs.id
+resource "aws_s3_bucket_public_access_block" "this" {
+  for_each = {
+    archive      = aws_s3_bucket.archive.id
+    archive_logs = aws_s3_bucket.archive_logs.id
+  }
+
+  bucket = each.value
 
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+# Denies any request to this bucket that doesn't use TLS, regardless of caller identity or
+# permissions -- SonarCloud flags a bucket with no policy enforcing this (S3 traffic is otherwise
+# allowed over plain HTTP, exposing archived event/saga-state payloads in transit).
+resource "aws_s3_bucket_policy" "archive_https_only" {
+  bucket = aws_s3_bucket.archive.id
+
+  policy = jsonencode({
+    Version   = "2012-10-17"
+    Statement = [local.deny_insecure_transport_statements["archive"]]
+  })
 }
 
 resource "aws_s3_bucket_policy" "archive_logs" {
@@ -94,21 +96,7 @@ resource "aws_s3_bucket_policy" "archive_logs" {
           }
         }
       },
-      {
-        Sid       = "DenyInsecureTransport"
-        Effect    = "Deny"
-        Principal = "*"
-        Action    = "s3:*"
-        Resource = [
-          aws_s3_bucket.archive_logs.arn,
-          "${aws_s3_bucket.archive_logs.arn}/*",
-        ]
-        Condition = {
-          Bool = {
-            "aws:SecureTransport" = "false"
-          }
-        }
-      }
+      local.deny_insecure_transport_statements["archive_logs"],
     ]
   })
 }
