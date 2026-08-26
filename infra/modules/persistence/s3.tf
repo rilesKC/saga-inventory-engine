@@ -1,27 +1,5 @@
 data "aws_caller_identity" "current" {}
 
-locals {
-  # Deny statement is identical for both buckets except which bucket it protects -- kept as one
-  # template here instead of the same literal JSON copy-pasted into both policies below.
-  deny_insecure_transport_statements = {
-    for key, bucket in {
-      archive      = aws_s3_bucket.archive
-      archive_logs = aws_s3_bucket.archive_logs
-      } : key => {
-      Sid       = "DenyInsecureTransport"
-      Effect    = "Deny"
-      Principal = "*"
-      Action    = "s3:*"
-      Resource  = [bucket.arn, "${bucket.arn}/*"]
-      Condition = {
-        Bool = {
-          "aws:SecureTransport" = "false"
-        }
-      }
-    }
-  }
-}
-
 resource "aws_s3_bucket" "archive" {
   bucket = var.archive_bucket_name
 
@@ -65,13 +43,33 @@ resource "aws_s3_bucket_public_access_block" "this" {
 
 # Denies any request to this bucket that doesn't use TLS, regardless of caller identity or
 # permissions -- SonarCloud flags a bucket with no policy enforcing this (S3 traffic is otherwise
-# allowed over plain HTTP, exposing archived event/saga-state payloads in transit).
+# allowed over plain HTTP, exposing archived event/saga-state payloads in transit). Kept as a
+# literal inline statement (not factored into a shared `locals` value) deliberately -- SonarCloud's
+# Terraform scanner pattern-matches on literal policy JSON and doesn't resolve `locals`/`for`
+# indirection, so extracting this into a shared template made the scanner unable to see the control
+# on this bucket even though `terraform validate`/apply behavior was identical either way.
 resource "aws_s3_bucket_policy" "archive_https_only" {
   bucket = aws_s3_bucket.archive.id
 
   policy = jsonencode({
-    Version   = "2012-10-17"
-    Statement = [local.deny_insecure_transport_statements["archive"]]
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource = [
+          aws_s3_bucket.archive.arn,
+          "${aws_s3_bucket.archive.arn}/*",
+        ]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      }
+    ]
   })
 }
 
@@ -96,7 +94,21 @@ resource "aws_s3_bucket_policy" "archive_logs" {
           }
         }
       },
-      local.deny_insecure_transport_statements["archive_logs"],
+      {
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource = [
+          aws_s3_bucket.archive_logs.arn,
+          "${aws_s3_bucket.archive_logs.arn}/*",
+        ]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
+        }
+      }
     ]
   })
 }
