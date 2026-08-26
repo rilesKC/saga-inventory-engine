@@ -19,7 +19,7 @@ public class InventoryWiringTests
         var leakedToInbound = false;
         inboundRaw.Subscribe<StockReservedReply>(_ => leakedToInbound = true);
 
-        inboundRaw.Publish(new ReserveStockCommand("ORDER-1", "SKU-1", 4));
+        inboundRaw.Publish(new ReserveStockCommand("ORDER-1", "SKU-1", 4, 199.99m));
 
         Assert.NotNull(onOutbound);
         Assert.Equal("ORDER-1", onOutbound.OrderId);

@@ -53,7 +53,7 @@ public sealed class SagaCoordinator
         ApplyWithRetry(orderPlaced.OrderId, _ => new SagaState(
             orderPlaced.OrderId, orderPlaced.Sku, orderPlaced.Quantity, orderPlaced.Amount, SagaStep.ReservingStock));
 
-        _outbound.Publish(new ReserveStockCommand(orderPlaced.OrderId, orderPlaced.Sku, orderPlaced.Quantity));
+        _outbound.Publish(new ReserveStockCommand(orderPlaced.OrderId, orderPlaced.Sku, orderPlaced.Quantity, orderPlaced.Amount));
     }
 
     private void OnStockReservedReply(StockReservedReply reply)

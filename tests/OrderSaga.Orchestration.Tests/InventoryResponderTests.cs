@@ -21,7 +21,7 @@ public class InventoryResponderTests
         StockReservedReply? published = null;
         bus.Subscribe<StockReservedReply>(e => published = e);
 
-        bus.Publish(new ReserveStockCommand("ORDER-1", "SKU-1", 4));
+        bus.Publish(new ReserveStockCommand("ORDER-1", "SKU-1", 4, 199.99m));
 
         Assert.NotNull(published);
         Assert.Equal("SKU-1", published.Sku);
@@ -39,7 +39,7 @@ public class InventoryResponderTests
         StockReservationFailedReply? published = null;
         bus.Subscribe<StockReservationFailedReply>(e => published = e);
 
-        bus.Publish(new ReserveStockCommand("ORDER-1", "SKU-1", 11));
+        bus.Publish(new ReserveStockCommand("ORDER-1", "SKU-1", 11, 199.99m));
 
         Assert.NotNull(published);
         Assert.Equal("SKU-1", published.Sku);
@@ -94,12 +94,13 @@ public class InventoryResponderTests
         var eventStore = await SeedAsync("SKU-1", 10);
         _ = new InventoryResponder(new InboundEventBus(bus), new OutboundEventBus(bus), eventStore);
 
-        bus.Publish(new ReserveStockCommand("ORDER-1", "SKU-1", 4));
+        bus.Publish(new ReserveStockCommand("ORDER-1", "SKU-1", 4, 199.99m));
 
         var events = await eventStore.LoadEventsAsync("SKU-1", CancellationToken.None);
         var stockReserved = Assert.Single(events.OfType<StockReserved>());
         Assert.Equal("ORDER-1", stockReserved.OrderId);
         Assert.Equal(4, stockReserved.Quantity);
+        Assert.Equal(199.99m, stockReserved.Amount);
     }
 
     [Fact]
@@ -111,7 +112,7 @@ public class InventoryResponderTests
         var eventStore = new RaceInjectingEventStore(await SeedAsync("SKU-1", 10));
         _ = new InventoryResponder(new InboundEventBus(bus), new OutboundEventBus(bus), eventStore);
 
-        bus.Publish(new ReserveStockCommand("ORDER-1", "SKU-1", 4));
+        bus.Publish(new ReserveStockCommand("ORDER-1", "SKU-1", 4, 199.99m));
 
         var item = InventoryItem.LoadFromHistory(await eventStore.LoadEventsAsync("SKU-1", CancellationToken.None));
         Assert.Equal(1, eventStore.ConflictsInjected);
@@ -162,7 +163,7 @@ public class InventoryResponderTests
         _ = new InventoryResponder(new InboundEventBus(bus), new OutboundEventBus(bus), eventStore);
 
         Assert.Throws<Inventory.Domain.ConcurrencyConflictException>(() =>
-            bus.Publish(new ReserveStockCommand("ORDER-1", "SKU-1", 4)));
+            bus.Publish(new ReserveStockCommand("ORDER-1", "SKU-1", 4, 199.99m)));
 
         Assert.Equal(RetryBackoff.MaxAttempts, eventStore.AttemptsMade);
     }

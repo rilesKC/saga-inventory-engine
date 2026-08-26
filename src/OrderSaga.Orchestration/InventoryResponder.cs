@@ -31,11 +31,12 @@ public sealed class InventoryResponder
     {
         try
         {
-            // Amount is left unset here: unlike choreography's PaymentStub (which reads it directly
-            // off Inventory.Domain's StockReserved, see PaymentStub.OnStockReserved), orchestration's
-            // payment decision reads Amount from the coordinator's own persisted SagaState
-            // (SagaCoordinator.OnStockReservedReply), so this bounded context never needs it.
-            ApplyWithRetry(command.Sku, item => item.Handle(new ReserveStock(command.Sku, command.OrderId, command.Quantity, Amount: 0m)));
+            // Amount isn't used for any payment decision here -- orchestration's payment decision
+            // reads it from the coordinator's own persisted SagaState (SagaCoordinator.OnStockReservedReply)
+            // -- but it's threaded through anyway so the durably-persisted StockReserved event (Mongo
+            // + S3 archive, same as choreography's) stays a truthful record rather than always
+            // recording 0 for orchestration-sourced reservations.
+            ApplyWithRetry(command.Sku, item => item.Handle(new ReserveStock(command.Sku, command.OrderId, command.Quantity, command.Amount)));
         }
         catch (InsufficientStockException)
         {

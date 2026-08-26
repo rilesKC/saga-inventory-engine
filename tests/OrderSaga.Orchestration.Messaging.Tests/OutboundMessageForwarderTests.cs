@@ -18,7 +18,7 @@ public class OutboundMessageForwarderTests
         var bus = new EventBus();
         var publisher = new RecordingMessagePublisher();
         _ = new OutboundMessageForwarder(bus, _ => publisher);
-        var command = new ReserveStockCommand("ORDER-1", "SKU-1", 4);
+        var command = new ReserveStockCommand("ORDER-1", "SKU-1", 4, 199.99m);
 
         bus.Publish(command);
 
@@ -34,7 +34,7 @@ public class OutboundMessageForwarderTests
         var statelessResponderPublisher = new RecordingMessagePublisher();
         _ = new OutboundMessageForwarder(bus, type =>
             type == typeof(ReserveStockCommand) ? inventoryPublisher : statelessResponderPublisher);
-        var reserveStock = new ReserveStockCommand("ORDER-1", "SKU-1", 4);
+        var reserveStock = new ReserveStockCommand("ORDER-1", "SKU-1", 4, 199.99m);
         var chargePayment = new ChargePaymentCommand("ORDER-1", "SKU-1", 199.99m);
 
         bus.Publish(reserveStock);

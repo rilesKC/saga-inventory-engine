@@ -1,6 +1,6 @@
 namespace OrderSaga.Orchestration;
 
-public sealed record ReserveStockCommand(string OrderId, string Sku, int Quantity);
+public sealed record ReserveStockCommand(string OrderId, string Sku, int Quantity, decimal Amount);
 
 public sealed record ConfirmReservationCommand(string OrderId, string Sku);
 
