@@ -83,7 +83,13 @@ public sealed class InventoryResponder
             {
                 _eventStore.AppendRangeAsync(sku, history.Count, item.UncommittedEvents, CancellationToken.None).GetAwaiter().GetResult();
             }
-            catch (ConcurrencyConflictException)
+            // Fully qualified: this class's own namespace (OrderSaga.Orchestration) declares its own
+            // ConcurrencyConflictException (see ConcurrencyConflictException.cs, used by
+            // ISagaStateStore), which an unqualified reference here would bind to instead of the
+            // Inventory.Domain one IInventoryEventStore actually throws -- same enclosing namespace
+            // wins over `using Inventory.Domain;`, with no compiler ambiguity error. That silently
+            // defeated this whole retry loop until caught by a full-effort code review.
+            catch (Inventory.Domain.ConcurrencyConflictException)
             {
                 continue;
             }

@@ -137,7 +137,12 @@ public class InventoryResponderTests
                 _raceInjected = true;
                 ConflictsInjected++;
                 await inner.AppendRangeAsync(sku, expectedEventCount, [new StockReserved(sku, "ORDER-RACE", 3, 49.99m)], cancellationToken);
-                throw new ConcurrencyConflictException(sku, expectedEventCount, expectedEventCount + 1);
+                // Fully qualified: this test file's namespace (OrderSaga.Orchestration.Tests) nests
+                // under OrderSaga.Orchestration, which declares its own ConcurrencyConflictException --
+                // an unqualified reference here resolves to that one instead of Inventory.Domain's,
+                // silently testing the wrong type. That exact collision is what let InventoryResponder's
+                // real catch clause bind to the wrong exception undetected (see InventoryResponder.cs).
+                throw new Inventory.Domain.ConcurrencyConflictException(sku, expectedEventCount, expectedEventCount + 1);
             }
 
             await inner.AppendRangeAsync(sku, expectedEventCount, events, cancellationToken);
