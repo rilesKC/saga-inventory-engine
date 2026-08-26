@@ -22,10 +22,25 @@ real AWS-native stack (Step Functions/EventBridge DAGs).
 ## Status
 
 Inventory aggregate (event log + projection) and both saga implementations (choreography,
-orchestration) complete — all in-process/domain-layer only so far, no real AWS/LocalStack wiring
-yet. See `docs/specs/` and `docs/plans/` for each piece's spec and task breakdown.
+orchestration) are complete and deployed to real AWS:
+
+- **Choreography** (`src/OrderSaga.Choreography.Host`) — one shared Fargate service, EventBridge
+  pub/sub, SQS delivery, DynamoDB idempotency. Infra under `infra/`.
+- **Orchestration** (`src/OrderSaga.Orchestration.{CoordinatorHost,InventoryHost,ResponderHost}`) —
+  three separate Fargate services (Coordinator, Inventory, and a shared stateless Payment+Shipping
+  responder), direct SQS (no EventBridge — every command is point-to-point), its own DynamoDB
+  idempotency table. Infra under `infra/orchestration/`.
+
+Both stacks were validated against LocalStack, then deployed for real, exercised end-to-end
+(happy path, insufficient stock, payment declined), and torn down — see
+[docs/localstack-setup.md](docs/localstack-setup.md) /
+[docs/localstack-setup-orchestration.md](docs/localstack-setup-orchestration.md) to reproduce
+either. See `docs/specs/` and `docs/plans/` for each piece's spec and task breakdown, and
+[docs/choreography-vs-orchestration.md](docs/choreography-vs-orchestration.md) for what deploying
+both actually showed, not just building both.
 
 ## Development process
 
 This project uses a spec-first pipeline: `/brainstorm` → `/plan` → test-first implementation →
-`/review-task`. See `docs/specs/` and `docs/plans/` once they exist.
+`/review-task`. See `docs/specs/` and `docs/plans/` for the full history of specs and task
+breakdowns this pipeline has produced so far.

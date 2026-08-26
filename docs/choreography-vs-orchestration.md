@@ -106,4 +106,68 @@ surface questions this project hasn't touched yet: what happens when a service c
 recovery story entirely), how idempotency-by-claim and DLQ-backed retry change these designs once
 delivery is at-least-once over a real queue instead of guaranteed in-process, and how each pattern
 shows up in a real audit trail once events are actually persisted rather than living in a `List`
-that vanishes when the process exits. Worth designing next, once real AWS/LocalStack wiring lands.
+that vanishes when the process exits. Worth designing next, once real AWS/LocalStack wiring lands —
+see below for what actually happened once it did, for both.
+
+## Now that both are actually deployed
+
+Both implementations have since been deployed to real AWS and torn down cleanly (see
+`docs/specs/choreography-aws-infra.md` / `docs/plans/choreography-aws-infra-plan.md` and
+`docs/specs/orchestration-aws-infra.md` / `docs/plans/orchestration-aws-infra-plan.md` for what that
+actually took). A few things the in-process comparison above couldn't have predicted:
+
+### The choreography-vs-orchestration split shows up as an infra decision, not just a code one
+
+Choreography's four participants are independent reactors with no reason to be separate
+processes — one shared Fargate service was the natural fit. Orchestration's coordinator-plus-responders
+shape is different enough that collapsing it into one shared service would just have been
+choreography's topology wearing different code; it deployed instead as three separate services
+(Coordinator, Inventory, and a combined stateless Payment+Shipping responder). That split also made
+a real scaling difference visible for the first time: the two responders holding no cross-order state
+(`PaymentResponder`, `ShippingResponder`) run `desired_count = 2` today, for free — something neither
+implementation could demonstrate while everything lived in one process.
+
+### EventBridge earns its place in exactly one of the two
+
+Choreography's pub/sub shape needs EventBridge — participants broadcast, and rule-based routing is
+what turns "a `StockReserved` event happened" into "every interested participant gets it."
+Orchestration's commands are all point-to-point (`SagaCoordinator` addresses exactly one intended
+consumer per command), so EventBridge would have added routing infrastructure with nothing to route.
+Orchestration's real deployment uses direct SQS instead, no EventBridge at all — a difference in the
+real infrastructure that only became visible once orchestration was made to answer "how does this
+actually get from the coordinator to a responder," not just "who calls what in-process."
+
+### The `EventBus` republish-loop bug recurred right on schedule
+
+Choreography's real AWS work surfaced (and fixed) an ordering bug where two participants reacting to
+the same event could interleave in a way that broke correlation (see "The ordering bug" above).
+Wiring orchestration's four responders onto real SQS hit the exact same class of bug for a different
+reason — sharing one `EventBus` for both inbound (SQS→bus) and outbound (bus→SQS) traffic let a
+participant's own outbound publish loop back through its own inbound subscriptions in-process,
+completely bypassing SQS. Both implementations needed the same fix: split into an `InboundEventBus`
+and `OutboundEventBus` (compile-time-distinct wrapper types around the same underlying `EventBus`),
+so the compiler — not just code review — rejects the two ever getting swapped again.
+
+### Two bugs only real AWS, not LocalStack, could surface
+
+- **A missing IAM permission.** The coordinator needed `sqs:SendMessage` on its *own* inbound queue
+  (it publishes the initial `OrderPlaced` trigger onto the same queue it polls), not just the two
+  command queues it fans out to. LocalStack doesn't enforce IAM at all, so this only showed up as an
+  HTTP 500 against real AWS.
+- **A `null`-vs-empty-list SDK quirk, twice.** Both `ReceiveMessageResponse.Messages` and
+  `DeleteMessageBatchResponse.Failed` come back `null` (not an empty list) on real AWS when there's
+  nothing to report; LocalStack's emulation returns `[]` instead. The first occurrence (choreography)
+  got fixed and code-reviewed; the second occurrence (orchestration, different file, same defect
+  class) shipped anyway, because the two Hosts' AWS plumbing was independently duplicated rather than
+  shared. Only real AWS deployment caught it. The plumbing has since been consolidated into one
+  shared `OrderSaga.Aws` project specifically so a fix like this only ever has to be made once.
+
+### A live demonstration of the persistence gap this project already named as out of scope
+
+Redeploying orchestration's fixed Docker images produced a stretch where two ECS tasks (old and new)
+both polled the same queue for several minutes — ECS's `rolloutState` reports `COMPLETED` before the
+old task's background poller actually stops. That's not a new bug; it's the already-documented
+`SagaState`-isn't-persisted gap (see "Out of Scope" in `docs/specs/orchestration-aws-infra.md`)
+showing up live during a deploy instead of only in a design doc. The DLQ-backed retry pattern
+absorbed it exactly as designed — both affected messages landed in the DLQ rather than being
+silently lost or double-processed.
