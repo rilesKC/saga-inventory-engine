@@ -22,6 +22,21 @@ public class SagaCoordinatorTests
     }
 
     [Fact]
+    public void OnStockReservedReply_NoSagaStateForOrder_ThrowsSagaNotFoundException()
+    {
+        // A reply arriving for an OrderId the coordinator has no persisted SagaState for (e.g. its
+        // OrderPlaced write never landed) must fail loudly and diagnosably, not with an opaque
+        // NullReferenceException from blindly dereferencing a null current state.
+        var bus = new EventBus();
+        _ = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus), new InMemorySagaStateStore());
+
+        var exception = Assert.Throws<SagaNotFoundException>(() =>
+            bus.Publish(new StockReservedReply("ORDER-ORPHAN", "SKU-1")));
+
+        Assert.Equal("ORDER-ORPHAN", exception.OrderId);
+    }
+
+    [Fact]
     public void OnStockReservedReply_PublishesChargePaymentCommandWithSagaAmount()
     {
         var bus = new EventBus();

@@ -58,36 +58,45 @@ public sealed class SagaCoordinator
 
     private void OnStockReservedReply(StockReservedReply reply)
     {
-        var saga = ApplyWithRetry(reply.OrderId, current => current! with { Step = SagaStep.AwaitingPayment });
+        var saga = ApplyWithRetry(reply.OrderId, current => RequireExisting(current, reply.OrderId) with { Step = SagaStep.AwaitingPayment });
         _outbound.Publish(new ChargePaymentCommand(reply.OrderId, reply.Sku, saga.Amount));
     }
 
     private void OnStockReservationFailedReply(StockReservationFailedReply reply) =>
-        ApplyWithRetry(reply.OrderId, current => current! with { Step = SagaStep.Failed });
+        ApplyWithRetry(reply.OrderId, current => RequireExisting(current, reply.OrderId) with { Step = SagaStep.Failed });
 
     private void OnPaymentChargedReply(PaymentChargedReply reply)
     {
-        ApplyWithRetry(reply.OrderId, current => current! with { Step = SagaStep.Confirming });
+        ApplyWithRetry(reply.OrderId, current => RequireExisting(current, reply.OrderId) with { Step = SagaStep.Confirming });
         _outbound.Publish(new ConfirmReservationCommand(reply.OrderId, reply.Sku));
     }
 
     private void OnPaymentDeclinedReply(PaymentDeclinedReply reply)
     {
-        ApplyWithRetry(reply.OrderId, current => current! with { Step = SagaStep.Compensating });
+        ApplyWithRetry(reply.OrderId, current => RequireExisting(current, reply.OrderId) with { Step = SagaStep.Compensating });
         _outbound.Publish(new ReleaseReservationCommand(reply.OrderId, reply.Sku));
     }
 
     private void OnReservationConfirmedReply(ReservationConfirmedReply reply)
     {
-        ApplyWithRetry(reply.OrderId, current => current! with { Step = SagaStep.SchedulingShipment });
+        ApplyWithRetry(reply.OrderId, current => RequireExisting(current, reply.OrderId) with { Step = SagaStep.SchedulingShipment });
         _outbound.Publish(new ScheduleShipmentCommand(reply.OrderId, reply.Sku));
     }
 
     private void OnReservationReleasedReply(ReservationReleasedReply reply) =>
-        ApplyWithRetry(reply.OrderId, current => current! with { Step = SagaStep.Compensated });
+        ApplyWithRetry(reply.OrderId, current => RequireExisting(current, reply.OrderId) with { Step = SagaStep.Compensated });
 
     private void OnShipmentScheduledReply(ShipmentScheduledReply reply) =>
-        ApplyWithRetry(reply.OrderId, current => current! with { Step = SagaStep.Completed });
+        ApplyWithRetry(reply.OrderId, current => RequireExisting(current, reply.OrderId) with { Step = SagaStep.Completed });
+
+    /// <summary>
+    /// Every handler above except OnOrderPlaced requires a saga to already exist for this OrderId
+    /// -- a reply arriving for an order the coordinator has no persisted SagaState for (e.g. its
+    /// OrderPlaced write never landed, or the state was lost) must fail loudly and diagnosably
+    /// rather than with an opaque NullReferenceException from blindly dereferencing null.
+    /// </summary>
+    private static SagaState RequireExisting(SagaState? current, string orderId) =>
+        current ?? throw new SagaNotFoundException(orderId);
 
     /// <summary>
     /// Reloads SagaState from the durable store, applies the transition, and saves the result
