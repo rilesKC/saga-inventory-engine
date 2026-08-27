@@ -65,9 +65,32 @@ public sealed class InventoryItem
 
     public void Handle(ReserveStock command)
     {
-        if (_reservations.ContainsKey(command.OrderId))
+        if (command.Quantity <= 0)
         {
-            return;
+            throw new InvalidReservationRequestException(command.Sku, command.OrderId, $"quantity must be positive, was {command.Quantity}.");
+        }
+
+        if (command.Amount < 0)
+        {
+            throw new InvalidReservationRequestException(command.Sku, command.OrderId, $"amount cannot be negative, was {command.Amount}.");
+        }
+
+        if (_reservations.TryGetValue(command.OrderId, out var existing))
+        {
+            if (existing.State == ReservationState.Reserved)
+            {
+                // Genuine duplicate of an already-active reservation (e.g. a redelivery before this
+                // event was ever published downstream) -- same outcome either way, safe to no-op.
+                return;
+            }
+
+            // The reservation for this OrderId already reached a terminal state (Confirmed or
+            // Released) -- this order is done, one way or another. A fresh ReserveStock for it is
+            // not a duplicate of the original success, it's an attempt to reopen something final.
+            // Previously this fell through the same ContainsKey check above and no-op'd silently
+            // regardless of which terminal state it was in, indistinguishable from success to the
+            // caller. Now explicit and loud, matching every other invalid-transition case below.
+            throw new InvalidReservationStateException(command.Sku, command.OrderId, nameof(ReserveStock));
         }
 
         if (command.Quantity > AvailableQuantity)
@@ -82,8 +105,11 @@ public sealed class InventoryItem
 
     public void Handle(ConfirmReservation command)
     {
-        var reservation = _reservations[command.OrderId];
-        if (reservation.State != ReservationState.Reserved)
+        // TryGetValue, not the indexer: an OrderId with no reservation at all (never seen a
+        // ReserveStock for it) used to throw a raw KeyNotFoundException here -- an
+        // implementation-detail exception type instead of the same domain exception every other
+        // invalid transition in this class already uses.
+        if (!_reservations.TryGetValue(command.OrderId, out var reservation) || reservation.State != ReservationState.Reserved)
         {
             throw new InvalidReservationStateException(command.Sku, command.OrderId, nameof(ConfirmReservation));
         }
@@ -95,8 +121,7 @@ public sealed class InventoryItem
 
     public void Handle(ReleaseReservation command)
     {
-        var reservation = _reservations[command.OrderId];
-        if (reservation.State != ReservationState.Reserved)
+        if (!_reservations.TryGetValue(command.OrderId, out var reservation) || reservation.State != ReservationState.Reserved)
         {
             throw new InvalidReservationStateException(command.Sku, command.OrderId, nameof(ReleaseReservation));
         }
