@@ -72,4 +72,45 @@ public class InMemoryInventoryEventStoreTests
         await Assert.ThrowsAsync<ConcurrencyConflictException>(() =>
             store.AppendRangeAsync("SKU-1", 1, [new StockReserved("SKU-1", "ORDER-2", 2, 99.99m)], CancellationToken.None));
     }
+
+    [Fact]
+    public async Task LoadUnpublishedAsync_AfterAppend_ReturnsNewlyAppendedEntries()
+    {
+        var store = new InMemoryInventoryEventStore();
+        var stockReserved = new StockReserved("SKU-1", "ORDER-1", 4, 199.99m);
+        await store.AppendRangeAsync("SKU-1", 0, [stockReserved], CancellationToken.None);
+
+        var pending = await store.LoadUnpublishedAsync(CancellationToken.None);
+
+        var entry = Assert.Single(pending);
+        Assert.Equal("SKU-1", entry.Sku);
+        Assert.Equal(0, entry.Sequence);
+        Assert.Equal(stockReserved, entry.Event);
+    }
+
+    [Fact]
+    public async Task MarkPublishedAsync_RemovesEntryFromLoadUnpublishedAsync()
+    {
+        var store = new InMemoryInventoryEventStore();
+        await store.AppendRangeAsync("SKU-1", 0, [new StockReserved("SKU-1", "ORDER-1", 4, 199.99m)], CancellationToken.None);
+
+        await store.MarkPublishedAsync("SKU-1", 0, CancellationToken.None);
+
+        Assert.Empty(await store.LoadUnpublishedAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task LoadUnpublishedAsync_StockSeededAppendedViaSeedPath_StillShowsAsUnpublished()
+    {
+        // The store itself doesn't know about IOutboundEvent -- filtering out event types that
+        // were never meant to leave the process (StockSeeded) is the drainer's job, not the
+        // store's. The store just tracks "has this entry been marked published," uniformly.
+        var store = new InMemoryInventoryEventStore();
+        var stockSeeded = new StockSeeded("SKU-1", 100);
+
+        await store.AppendRangeAsync("SKU-1", 0, [stockSeeded], CancellationToken.None);
+
+        var entry = Assert.Single(await store.LoadUnpublishedAsync(CancellationToken.None));
+        Assert.Equal(stockSeeded, entry.Event);
+    }
 }

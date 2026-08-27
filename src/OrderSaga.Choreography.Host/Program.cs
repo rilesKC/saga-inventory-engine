@@ -71,6 +71,30 @@ builder.Services.AddSingleton<IEventPublisher>(sp => new EventBridgeEventPublish
     sp.GetRequiredService<IHostApplicationLifetime>()));
 builder.Services.AddSingleton<IIdempotencyStore, DynamoDbIdempotencyStore>();
 
+// Mongo is the live InventoryItem event store; S3 is a best-effort secondary archive -- see
+// docs/specs/saga-persistence.md. Config-driven so this stack's cluster/collection/bucket never
+// collide with orchestration's separate ones. Registered as a DI singleton (rather than a raw
+// local, as before) specifically so OutboxDrainerBackgroundService below can depend on it --
+// AddHostedService factories run against the built container, so anything they need must be a
+// registered service, not a local variable declared after Build().
+var mongoConnectionString = builder.Configuration["Mongo:ConnectionString"]
+    ?? throw new InvalidOperationException("Configuration value 'Mongo:ConnectionString' is required.");
+var mongoDatabaseName = builder.Configuration["Mongo:DatabaseName"]
+    ?? throw new InvalidOperationException("Configuration value 'Mongo:DatabaseName' is required.");
+var inventoryEventsCollectionName = builder.Configuration["Mongo:InventoryEventsCollectionName"]
+    ?? throw new InvalidOperationException("Configuration value 'Mongo:InventoryEventsCollectionName' is required.");
+var archiveBucketName = builder.Configuration["S3:ArchiveBucketName"]
+    ?? throw new InvalidOperationException("Configuration value 'S3:ArchiveBucketName' is required.");
+
+builder.Services.AddSingleton<IInventoryEventStore>(sp =>
+{
+    var mongoDatabase = new MongoClient(mongoConnectionString).GetDatabase(mongoDatabaseName);
+    return new S3ArchivingInventoryEventStore(
+        new MongoInventoryEventStore(mongoDatabase, inventoryEventsCollectionName),
+        new S3EventArchiveWriter(sp.GetRequiredService<IAmazonS3>(), archiveBucketName),
+        sp.GetRequiredService<ILogger<S3ArchivingInventoryEventStore>>());
+});
+
 // Two separate buses, deliberately -- see InventoryParticipant's constructor doc comment.
 // SqsMessageProcessor publishes only to `inboundBus`, which every participant subscribes to;
 // participants publish their produced events only to `outboundBus`, which only
@@ -97,26 +121,14 @@ builder.Services.AddHostedService(sp => new SqsPollingBackgroundService(
     queueUrl,
     sp.GetRequiredService<ILogger<SqsPollingBackgroundService>>()));
 
+builder.Services.AddHostedService(sp => new OutboxDrainerBackgroundService(
+    sp.GetRequiredService<IInventoryEventStore>(),
+    sp.GetRequiredService<IEventPublisher>(),
+    sp.GetRequiredService<ILogger<OutboxDrainerBackgroundService>>()));
+
 var app = builder.Build();
 
-// Mongo is the live InventoryItem event store; S3 is a best-effort secondary archive -- see
-// docs/specs/saga-persistence.md. Config-driven so this stack's cluster/collection/bucket never
-// collide with orchestration's separate ones. Constructed directly (not via DI) since it's needed
-// before the container's hosted services start, to load-or-seed InventoryItem below.
-var mongoConnectionString = builder.Configuration["Mongo:ConnectionString"]
-    ?? throw new InvalidOperationException("Configuration value 'Mongo:ConnectionString' is required.");
-var mongoDatabaseName = builder.Configuration["Mongo:DatabaseName"]
-    ?? throw new InvalidOperationException("Configuration value 'Mongo:DatabaseName' is required.");
-var inventoryEventsCollectionName = builder.Configuration["Mongo:InventoryEventsCollectionName"]
-    ?? throw new InvalidOperationException("Configuration value 'Mongo:InventoryEventsCollectionName' is required.");
-var archiveBucketName = builder.Configuration["S3:ArchiveBucketName"]
-    ?? throw new InvalidOperationException("Configuration value 'S3:ArchiveBucketName' is required.");
-
-var mongoDatabase = new MongoClient(mongoConnectionString).GetDatabase(mongoDatabaseName);
-var eventStore = new S3ArchivingInventoryEventStore(
-    new MongoInventoryEventStore(mongoDatabase, inventoryEventsCollectionName),
-    new S3EventArchiveWriter(app.Services.GetRequiredService<IAmazonS3>(), archiveBucketName),
-    app.Services.GetRequiredService<ILogger<S3ArchivingInventoryEventStore>>());
+var eventStore = app.Services.GetRequiredService<IInventoryEventStore>();
 
 // Seed this SKU's history once, only on true first-run (an empty collection) -- InventoryParticipant
 // reloads state fresh from eventStore on every command from here on (see its ApplyWithRetry), so
@@ -151,9 +163,6 @@ _ = app.Services.GetRequiredService<OutboundEventForwarder>();
 app.MapGet("/health", () => Results.Ok());
 
 app.MapPost("/orders", (PlaceOrderRequest request, OrderIntakeHandler handler) =>
-{
-    handler.Handle(request);
-    return Results.Accepted();
-});
+    handler.Handle(request) ? Results.Accepted() : Results.BadRequest());
 
 app.Run();

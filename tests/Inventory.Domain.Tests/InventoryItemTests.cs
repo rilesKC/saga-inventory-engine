@@ -49,6 +49,46 @@ public class InventoryItemTests
     }
 
     [Fact]
+    public void ReserveStock_WithZeroQuantity_ThrowsInvalidReservationRequestExceptionAndEmitsNoEvent()
+    {
+        var item = InventoryItem.Seed("SKU-1", 10);
+
+        Assert.Throws<InvalidReservationRequestException>(() =>
+            item.Handle(new ReserveStock("SKU-1", "ORDER-1", 0, 199.99m)));
+
+        Assert.Equal(10, item.AvailableQuantity);
+        Assert.Single(item.UncommittedEvents);
+    }
+
+    [Fact]
+    public void ReserveStock_WithNegativeQuantity_ThrowsInvalidReservationRequestExceptionAndEmitsNoEvent()
+    {
+        // Before this fix, a negative Quantity passed the `> AvailableQuantity` check trivially
+        // (it's never greater), then Apply(StockReserved) did `ReservedQuantity += stockReserved.Quantity`
+        // -- subtracting from ReservedQuantity, which *increases* AvailableQuantity. A negative
+        // Quantity conjured free inventory out of thin air instead of being rejected.
+        var item = InventoryItem.Seed("SKU-1", 10);
+
+        Assert.Throws<InvalidReservationRequestException>(() =>
+            item.Handle(new ReserveStock("SKU-1", "ORDER-1", -5, 199.99m)));
+
+        Assert.Equal(10, item.AvailableQuantity);
+        Assert.Single(item.UncommittedEvents);
+    }
+
+    [Fact]
+    public void ReserveStock_WithNegativeAmount_ThrowsInvalidReservationRequestExceptionAndEmitsNoEvent()
+    {
+        var item = InventoryItem.Seed("SKU-1", 10);
+
+        Assert.Throws<InvalidReservationRequestException>(() =>
+            item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4, -199.99m)));
+
+        Assert.Equal(10, item.AvailableQuantity);
+        Assert.Single(item.UncommittedEvents);
+    }
+
+    [Fact]
     public void ReserveStock_DuplicateForSameOrderAndSku_ReturnsExistingReservationWithoutReducingAvailableAgain()
     {
         var item = InventoryItem.Seed("SKU-1", 10);
@@ -113,6 +153,54 @@ public class InventoryItemTests
 
         Assert.Throws<InvalidReservationStateException>(() =>
             item.Handle(new ReleaseReservation("SKU-1", "ORDER-1")));
+    }
+
+    [Fact]
+    public void ReserveStock_OrderIdAlreadyReleased_ThrowsInvalidReservationStateException()
+    {
+        // Before this fix, Handle(ReserveStock)'s dedup checked only whether the OrderId existed at
+        // all, not its state -- a released reservation (e.g. payment declined) silently no-op'd a
+        // fresh ReserveStock for the same OrderId instead of throwing, indistinguishable from a
+        // genuine successful duplicate to the caller.
+        var item = InventoryItem.Seed("SKU-1", 10);
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4, 199.99m));
+        item.Handle(new ReleaseReservation("SKU-1", "ORDER-1"));
+
+        Assert.Throws<InvalidReservationStateException>(() =>
+            item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4, 199.99m)));
+    }
+
+    [Fact]
+    public void ReserveStock_OrderIdAlreadyConfirmed_ThrowsInvalidReservationStateException()
+    {
+        var item = InventoryItem.Seed("SKU-1", 10);
+        item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4, 199.99m));
+        item.Handle(new ConfirmReservation("SKU-1", "ORDER-1"));
+
+        Assert.Throws<InvalidReservationStateException>(() =>
+            item.Handle(new ReserveStock("SKU-1", "ORDER-1", 4, 199.99m)));
+    }
+
+    [Fact]
+    public void ConfirmReservation_OrderIdNeverReserved_ThrowsInvalidReservationStateExceptionNotKeyNotFound()
+    {
+        // The unguarded dictionary indexer this replaced leaked a raw KeyNotFoundException for an
+        // OrderId with no reservation at all -- an implementation-detail exception type where a
+        // meaningful domain exception (the same one already used for every other invalid
+        // transition here) is expected.
+        var item = InventoryItem.Seed("SKU-1", 10);
+
+        Assert.Throws<InvalidReservationStateException>(() =>
+            item.Handle(new ConfirmReservation("SKU-1", "ORDER-UNKNOWN")));
+    }
+
+    [Fact]
+    public void ReleaseReservation_OrderIdNeverReserved_ThrowsInvalidReservationStateExceptionNotKeyNotFound()
+    {
+        var item = InventoryItem.Seed("SKU-1", 10);
+
+        Assert.Throws<InvalidReservationStateException>(() =>
+            item.Handle(new ReleaseReservation("SKU-1", "ORDER-UNKNOWN")));
     }
 
     [Fact]

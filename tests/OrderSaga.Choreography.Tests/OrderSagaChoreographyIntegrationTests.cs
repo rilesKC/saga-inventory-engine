@@ -19,6 +19,38 @@ public class OrderSagaChoreographyIntegrationTests
     private static async Task<InventoryItem> LoadItemAsync(InMemoryInventoryEventStore eventStore, string sku) =>
         InventoryItem.LoadFromHistory(await eventStore.LoadEventsAsync(sku, CancellationToken.None));
 
+    /// <summary>
+    /// Simulates OutboxDrainerBackgroundService's job in-process: InventoryParticipant no longer
+    /// publishes synchronously (see its ApplyWithRetry doc comment), so this saga's full chain --
+    /// which other participants like PaymentStub/ShippingStub react to -- needs an explicit drain
+    /// step between "appended" and "the next participant sees it," the same gap the real drainer
+    /// bridges via polling in production. Loops because draining one entry can synchronously
+    /// trigger a downstream participant to cause a further append (e.g. draining StockReserved
+    /// triggers PaymentStub, which triggers InventoryParticipant to append ReservationConfirmed) --
+    /// a single pass over one LoadUnpublishedAsync snapshot won't see that new entry.
+    /// </summary>
+    private static async Task DrainOutboxAsync(EventBus bus, InMemoryInventoryEventStore eventStore)
+    {
+        while (true)
+        {
+            var pending = await eventStore.LoadUnpublishedAsync(CancellationToken.None);
+            if (pending.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var entry in pending)
+            {
+                if (entry.Event is IOutboundEvent)
+                {
+                    bus.Publish(entry.Event);
+                }
+
+                await eventStore.MarkPublishedAsync(entry.Sku, entry.Sequence, CancellationToken.None);
+            }
+        }
+    }
+
     [Fact]
     public async Task OrderPlaced_HappyPath_EndsWithShipmentScheduledAndReservationConfirmed()
     {
@@ -27,6 +59,7 @@ public class OrderSagaChoreographyIntegrationTests
         bus.Subscribe<ShipmentScheduled>(e => shipmentScheduled = e);
 
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
+        await DrainOutboxAsync(bus, eventStore);
 
         Assert.NotNull(shipmentScheduled);
         Assert.Equal("ORDER-1", shipmentScheduled.OrderId);
@@ -66,6 +99,7 @@ public class OrderSagaChoreographyIntegrationTests
         bus.Subscribe<ShipmentScheduled>(_ => shippingFired = true);
 
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 999.99m));
+        await DrainOutboxAsync(bus, eventStore);
 
         Assert.NotNull(released);
         Assert.Equal("ORDER-1", released.OrderId);

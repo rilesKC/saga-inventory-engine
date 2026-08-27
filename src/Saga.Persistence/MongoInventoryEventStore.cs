@@ -49,6 +49,7 @@ public sealed class MongoInventoryEventStore : IInventoryEventStore
             ["Sequence"] = expectedEventCount + i,
             ["EventType"] = @event.GetType().Name,
             ["Payload"] = @event.ToBsonDocument(@event.GetType()),
+            ["Published"] = false,
         });
 
         try
@@ -77,5 +78,32 @@ public sealed class MongoInventoryEventStore : IInventoryEventStore
                 return BsonSerializer.Deserialize(document["Payload"].AsBsonDocument, eventType);
             })
             .ToList();
+    }
+
+    public async Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken)
+    {
+        // Ne("Published", true) rather than Eq("Published", false): safely matches documents
+        // written before this field existed (no field at all), not just an explicit false.
+        var filter = Builders<BsonDocument>.Filter.Ne("Published", true);
+        var sort = Builders<BsonDocument>.Sort.Ascending("Sku").Ascending("Sequence");
+
+        var documents = await _collection.Find(filter).Sort(sort).ToListAsync(cancellationToken);
+
+        return documents
+            .Select(document =>
+            {
+                var eventType = TypesByName[document["EventType"].AsString];
+                var @event = BsonSerializer.Deserialize(document["Payload"].AsBsonDocument, eventType);
+                return new PendingOutboxEntry(document["Sku"].AsString, document["Sequence"].AsInt32, @event);
+            })
+            .ToList();
+    }
+
+    public async Task MarkPublishedAsync(string sku, int sequence, CancellationToken cancellationToken)
+    {
+        var filter = Builders<BsonDocument>.Filter.Eq("Sku", sku) & Builders<BsonDocument>.Filter.Eq("Sequence", sequence);
+        var update = Builders<BsonDocument>.Update.Set("Published", true);
+
+        await _collection.UpdateOneAsync(filter, update, cancellationToken: cancellationToken);
     }
 }

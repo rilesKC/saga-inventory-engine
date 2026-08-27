@@ -21,21 +21,29 @@ public class HostParticipantWiringTests
     }
 
     [Fact]
-    public async Task Wire_OrderPlacedOnInbound_PublishesStockReservedOnOutboundOnly()
+    public async Task Wire_OrderPlacedOnInbound_AppendsStockReservedAsPendingOutboxEntryWithoutLeakingOntoEitherBus()
     {
+        // InventoryParticipant no longer publishes synchronously onto _outbound (see its
+        // ApplyWithRetry doc comment) -- OutboxDrainerBackgroundService is what forwards a pending
+        // entry onto the real transport in production. This test now covers that the wiring
+        // doesn't leak the event onto either bus directly, and that it lands in the durable store
+        // as pending -- not that it appears on outboundRaw synchronously.
         var inboundRaw = new EventBus();
         var outboundRaw = new EventBus();
-        HostParticipantWiring.Wire(new InboundEventBus(inboundRaw), new OutboundEventBus(outboundRaw), paymentDeclineThreshold: 500m, await SeedAsync("SKU-1", 10));
-        StockReserved? onOutbound = null;
-        outboundRaw.Subscribe<StockReserved>(e => onOutbound = e);
+        var eventStore = await SeedAsync("SKU-1", 10);
+        HostParticipantWiring.Wire(new InboundEventBus(inboundRaw), new OutboundEventBus(outboundRaw), paymentDeclineThreshold: 500m, eventStore);
+        var leakedToOutbound = false;
+        outboundRaw.Subscribe<StockReserved>(_ => leakedToOutbound = true);
         var leakedToInbound = false;
         inboundRaw.Subscribe<StockReserved>(_ => leakedToInbound = true);
 
         inboundRaw.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
 
-        Assert.NotNull(onOutbound);
-        Assert.Equal("ORDER-1", onOutbound.OrderId);
+        Assert.False(leakedToOutbound);
         Assert.False(leakedToInbound);
+        var pending = await eventStore.LoadUnpublishedAsync(CancellationToken.None);
+        var stockReserved = Assert.IsType<StockReserved>(Assert.Single(pending, e => e.Event is StockReserved).Event);
+        Assert.Equal("ORDER-1", stockReserved.OrderId);
     }
 
     [Fact]

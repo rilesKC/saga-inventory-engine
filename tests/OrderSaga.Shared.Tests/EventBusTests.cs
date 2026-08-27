@@ -47,4 +47,26 @@ public class EventBusTests
 
         Assert.Equal(["first-handler-A", "first-handler-B", "second-handler"], order);
     }
+
+    private sealed record ThirdEvent;
+
+    [Fact]
+    public void Publish_HandlerThrows_DoesNotLeakPendingEventsIntoTheNextUnrelatedPublish()
+    {
+        // A production EventBus instance is a singleton for the host's lifetime (both
+        // SqsMessageProcessor implementations hold one). If a handler enqueues a nested event and a
+        // sibling handler then throws, the dispatch loop aborts mid-way -- the nested event must not
+        // sit in _pending waiting to be dequeued by some later, entirely unrelated Publish call.
+        var bus = new EventBus();
+        var secondEventDispatchCount = 0;
+        bus.Subscribe<FirstEvent>(_ => bus.Publish(new SecondEvent()));
+        bus.Subscribe<FirstEvent>(_ => throw new InvalidOperationException("simulated handler failure"));
+        bus.Subscribe<SecondEvent>(_ => secondEventDispatchCount++);
+        bus.Subscribe<ThirdEvent>(_ => { });
+
+        Assert.Throws<InvalidOperationException>(() => bus.Publish(new FirstEvent()));
+        bus.Publish(new ThirdEvent());
+
+        Assert.Equal(0, secondEventDispatchCount);
+    }
 }

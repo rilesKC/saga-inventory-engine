@@ -74,36 +74,48 @@ public sealed class SagaCoordinator
 
     private void OnStockReservedReply(StockReservedReply reply)
     {
-        var saga = ApplyWithRetry(reply.OrderId, current => RequireExisting(current, reply.OrderId) with { Step = SagaStep.AwaitingPayment });
-        _outbound.Publish(new ChargePaymentCommand(reply.OrderId, reply.Sku, saga.Amount));
+        var saga = ApplyWithRetry(reply.OrderId, current => IfAtStep(current, reply.OrderId, SagaStep.ReservingStock, SagaStep.AwaitingPayment));
+        if (saga is not null)
+        {
+            _outbound.Publish(new ChargePaymentCommand(reply.OrderId, reply.Sku, saga.Amount));
+        }
     }
 
     private void OnStockReservationFailedReply(StockReservationFailedReply reply) =>
-        ApplyWithRetry(reply.OrderId, current => RequireExisting(current, reply.OrderId) with { Step = SagaStep.Failed });
+        ApplyWithRetry(reply.OrderId, current => IfAtStep(current, reply.OrderId, SagaStep.ReservingStock, SagaStep.Failed));
 
     private void OnPaymentChargedReply(PaymentChargedReply reply)
     {
-        ApplyWithRetry(reply.OrderId, current => RequireExisting(current, reply.OrderId) with { Step = SagaStep.Confirming });
-        _outbound.Publish(new ConfirmReservationCommand(reply.OrderId, reply.Sku));
+        var saga = ApplyWithRetry(reply.OrderId, current => IfAtStep(current, reply.OrderId, SagaStep.AwaitingPayment, SagaStep.Confirming));
+        if (saga is not null)
+        {
+            _outbound.Publish(new ConfirmReservationCommand(reply.OrderId, reply.Sku));
+        }
     }
 
     private void OnPaymentDeclinedReply(PaymentDeclinedReply reply)
     {
-        ApplyWithRetry(reply.OrderId, current => RequireExisting(current, reply.OrderId) with { Step = SagaStep.Compensating });
-        _outbound.Publish(new ReleaseReservationCommand(reply.OrderId, reply.Sku));
+        var saga = ApplyWithRetry(reply.OrderId, current => IfAtStep(current, reply.OrderId, SagaStep.AwaitingPayment, SagaStep.Compensating));
+        if (saga is not null)
+        {
+            _outbound.Publish(new ReleaseReservationCommand(reply.OrderId, reply.Sku));
+        }
     }
 
     private void OnReservationConfirmedReply(ReservationConfirmedReply reply)
     {
-        ApplyWithRetry(reply.OrderId, current => RequireExisting(current, reply.OrderId) with { Step = SagaStep.SchedulingShipment });
-        _outbound.Publish(new ScheduleShipmentCommand(reply.OrderId, reply.Sku));
+        var saga = ApplyWithRetry(reply.OrderId, current => IfAtStep(current, reply.OrderId, SagaStep.Confirming, SagaStep.SchedulingShipment));
+        if (saga is not null)
+        {
+            _outbound.Publish(new ScheduleShipmentCommand(reply.OrderId, reply.Sku));
+        }
     }
 
     private void OnReservationReleasedReply(ReservationReleasedReply reply) =>
-        ApplyWithRetry(reply.OrderId, current => RequireExisting(current, reply.OrderId) with { Step = SagaStep.Compensated });
+        ApplyWithRetry(reply.OrderId, current => IfAtStep(current, reply.OrderId, SagaStep.Compensating, SagaStep.Compensated));
 
     private void OnShipmentScheduledReply(ShipmentScheduledReply reply) =>
-        ApplyWithRetry(reply.OrderId, current => RequireExisting(current, reply.OrderId) with { Step = SagaStep.Completed });
+        ApplyWithRetry(reply.OrderId, current => IfAtStep(current, reply.OrderId, SagaStep.SchedulingShipment, SagaStep.Completed));
 
     /// <summary>
     /// Every handler above except OnOrderPlaced requires a saga to already exist for this OrderId
@@ -115,20 +127,46 @@ public sealed class SagaCoordinator
         current ?? throw new SagaNotFoundException(orderId);
 
     /// <summary>
+    /// A reply handler's shared guard: only apply the transition if the saga is actually at the
+    /// step this reply expects to advance it from. Without this, a stale or duplicate reply (e.g.
+    /// a redelivered SQS message arriving after the saga has already advanced further) would
+    /// unconditionally overwrite Step -- regressing an already-advanced saga backward and, for
+    /// handlers that publish, re-issuing a command that was already issued once. Returns null (a
+    /// no-op, same idiom ApplyWithRetry's callers below rely on) when the saga isn't at
+    /// expectedStep; the caller must not treat that as "safe to also skip" for OnOrderPlaced, which
+    /// has its own null-never transition and is unaffected by this helper.
+    /// </summary>
+    private static SagaState? IfAtStep(SagaState? current, string orderId, SagaStep expectedStep, SagaStep nextStep)
+    {
+        var existing = RequireExisting(current, orderId);
+        return existing.Step == expectedStep ? existing with { Step = nextStep } : null;
+    }
+
+    /// <summary>
     /// Reloads SagaState from the durable store, applies the transition, and saves the result
     /// guarded by optimistic concurrency -- retrying from a fresh reload if a concurrent writer
     /// (the other Host instance) already saved a newer version first. transition receives the
     /// current state (null only for a brand-new order, i.e. OnOrderPlaced) and returns the new
-    /// state to save. Bounded via RetryBackoff -- under sustained contention (every attempt
-    /// conflicts), the last ConcurrencyConflictException propagates to the caller instead of
-    /// retrying forever.
+    /// state to save, or null for a no-op (the saga isn't at the step this transition expects --
+    /// see IfAtStep) -- nothing is saved and this returns null, mirroring the
+    /// UncommittedEvents.Count == 0 early-return idiom InventoryParticipant/InventoryResponder's
+    /// own ApplyWithRetry already use. Bounded via RetryBackoff -- under sustained contention
+    /// (every attempt conflicts), the last ConcurrencyConflictException propagates to the caller
+    /// instead of retrying forever.
     /// </summary>
-    private SagaState ApplyWithRetry(string orderId, Func<SagaState?, SagaState> transition)
+    private SagaState? ApplyWithRetry(string orderId, Func<SagaState?, SagaState?> transition)
     {
         for (var attempt = 1; ; attempt++)
         {
             var current = _store.TryLoadAsync(orderId, CancellationToken.None).GetAwaiter().GetResult();
-            var next = transition(current) with { Version = (current?.Version ?? 0) + 1 };
+            var candidate = transition(current);
+
+            if (candidate is null)
+            {
+                return null;
+            }
+
+            var next = candidate with { Version = (current?.Version ?? 0) + 1 };
 
             try
             {

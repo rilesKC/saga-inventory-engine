@@ -95,9 +95,6 @@ _ = app.Services.GetRequiredService<OutboundMessageForwarder>();
 app.MapGet("/health", () => Results.Ok());
 
 app.MapPost("/orders", (PlaceOrderRequest request, OrderIntakeHandler handler) =>
-{
-    handler.Handle(request);
-    return Results.Accepted();
-});
+    handler.Handle(request) ? Results.Accepted() : Results.BadRequest());
 
 app.Run();

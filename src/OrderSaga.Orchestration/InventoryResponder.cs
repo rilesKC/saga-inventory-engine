@@ -49,13 +49,32 @@ public sealed class InventoryResponder
 
     private void OnConfirmReservationCommand(ConfirmReservationCommand command)
     {
-        ApplyWithRetry(command.Sku, item => item.Handle(new ConfirmReservation(command.Sku, command.OrderId)));
+        try
+        {
+            ApplyWithRetry(command.Sku, item => item.Handle(new ConfirmReservation(command.Sku, command.OrderId)));
+        }
+        catch (InvalidReservationStateException)
+        {
+            // Redelivered/duplicate ConfirmReservationCommand for an order already Confirmed or
+            // Released. Unlike choreography, this can't be a silent no-op: SagaCoordinator is
+            // waiting on a reply for this command and would stall forever without one, so the
+            // original success reply still goes out even though no new event was appended here.
+        }
+
         _outbound.Publish(new ReservationConfirmedReply(command.OrderId, command.Sku));
     }
 
     private void OnReleaseReservationCommand(ReleaseReservationCommand command)
     {
-        ApplyWithRetry(command.Sku, item => item.Handle(new ReleaseReservation(command.Sku, command.OrderId)));
+        try
+        {
+            ApplyWithRetry(command.Sku, item => item.Handle(new ReleaseReservation(command.Sku, command.OrderId)));
+        }
+        catch (InvalidReservationStateException)
+        {
+            // See OnConfirmReservationCommand -- same redelivery-safety reasoning.
+        }
+
         _outbound.Publish(new ReservationReleasedReply(command.OrderId, command.Sku));
     }
 

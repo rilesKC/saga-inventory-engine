@@ -21,8 +21,16 @@ public sealed class OrderIntakeHandler
         _publisher = publisher;
     }
 
-    public void Handle(PlaceOrderRequest request)
+    /// <returns>false if the request was rejected as invalid (nothing published, caller should
+    /// return a client error); true if it was published.</returns>
+    public bool Handle(PlaceOrderRequest request)
     {
+        if (request.Quantity <= 0 || request.Amount < 0)
+        {
+            return false;
+        }
+
         _publisher.Publish(new OrderPlaced(request.OrderId, request.Sku, request.Quantity, request.Amount));
+        return true;
     }
 }
