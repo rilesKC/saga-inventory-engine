@@ -213,3 +213,45 @@ concurrency, index-contamination, or Mongo-serialization bugs was ever visible u
 deployment — including one genuine live outage (the coordinator crash-looping on every restart
 once real `SagaState` data existed, from deserializing Mongo's own auto-generated `_id` field into
 a type with no property for it), caught and fixed within the same deployment window.
+
+## Now that a full-solution review closed the remaining gaps
+
+A `/code-review` run against the whole solution (not just a diff) found 10 findings spanning
+security (Terraform) and application logic. Two of the fixes are genuinely about the
+choreography-vs-orchestration split itself, not just generic hardening:
+
+### The event-loss-on-publish-failure bug is real in exactly one of the two stacks
+
+Both `InventoryParticipant.ApplyWithRetry` (choreography) and `InventoryResponder.ApplyWithRetry`
+(orchestration) looked identical at a glance: append an event to the durable store, then publish
+it. The initial assumption was that both needed the same fix. Tracing each one carefully during
+planning showed that's wrong: choreography's version really did lose events (append succeeds,
+publish fails or the process crashes in between, and a redelivery's `Handle()` call sees the
+reservation already in its target state and skips the retry entirely) — but orchestration's
+`ApplyWithRetry` has no publish step at all. It only appends; each command handler publishes its
+*reply* separately, after `ApplyWithRetry` returns, and an earlier fix in the same session
+(catching `InvalidReservationStateException` and still replying) already made that redelivery-safe.
+
+This is the same asymmetry the "EventBridge earns its place in exactly one of the two" section
+above already named, showing up again for a different reason: choreography's participants depend
+on receiving the actual domain event (nobody else is going to tell them), while orchestration's
+`SagaCoordinator` only ever needs a yes/no reply, and a reply is trivially safe to resend on
+redelivery in a way a domain event silently isn't. The fix — a transactional outbox folded into the
+event store itself (a `Published` field on the same atomically-written document, no second
+collection or Mongo transaction needed) plus a new `OutboxDrainerBackgroundService` — only exists
+in choreography's Host. Orchestration's `InventoryResponder` is untouched.
+
+### A stale-reply regression risk in orchestration's coordinator, found by design reasoning alone
+
+Designing the redelivery-safe reply for `InventoryResponder` raised a question with no
+choreography equivalent: what happens if a stale or duplicate *reply* arrives at `SagaCoordinator`
+after the saga has already moved past the step that reply expects? Its handlers applied `Step`
+transitions unconditionally, with no check against the saga's current step — a redelivered
+`StockReservedReply` arriving after the saga had already advanced to `Confirming` could regress
+`Step` back to `AwaitingPayment` and re-issue `ChargePaymentCommand`. This class of bug has no
+analogue in choreography: there's no central `Step` for a stale event to regress, just independent
+participants each reacting to whatever they're subscribed to. Centralizing saga progress buys
+legibility (see "Where does 'saga progress' live?" above) at the cost of a new, coordinator-specific
+failure mode that choreography's design doesn't have room for in the first place. Fixed by
+generalizing the coordinator's own retry-transition delegate to allow a no-op (the same idiom the
+Inventory-side `ApplyWithRetry`s already used) plus a shared step-precondition guard.
