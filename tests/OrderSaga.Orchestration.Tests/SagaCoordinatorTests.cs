@@ -96,6 +96,7 @@ public class SagaCoordinatorTests
         var bus = new EventBus();
         var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus), new InMemorySagaStateStore());
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
+        bus.Publish(new StockReservedReply("ORDER-1", "SKU-1"));
         ConfirmReservationCommand? published = null;
         bus.Subscribe<ConfirmReservationCommand>(e => published = e);
 
@@ -113,6 +114,7 @@ public class SagaCoordinatorTests
         var bus = new EventBus();
         var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus), new InMemorySagaStateStore());
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 999.99m));
+        bus.Publish(new StockReservedReply("ORDER-1", "SKU-1"));
         ReleaseReservationCommand? published = null;
         bus.Subscribe<ReleaseReservationCommand>(e => published = e);
 
@@ -130,6 +132,8 @@ public class SagaCoordinatorTests
         var bus = new EventBus();
         var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus), new InMemorySagaStateStore());
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
+        bus.Publish(new StockReservedReply("ORDER-1", "SKU-1"));
+        bus.Publish(new PaymentChargedReply("ORDER-1", "SKU-1"));
         ScheduleShipmentCommand? published = null;
         bus.Subscribe<ScheduleShipmentCommand>(e => published = e);
 
@@ -147,6 +151,8 @@ public class SagaCoordinatorTests
         var bus = new EventBus();
         var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus), new InMemorySagaStateStore());
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 999.99m));
+        bus.Publish(new StockReservedReply("ORDER-1", "SKU-1"));
+        bus.Publish(new PaymentDeclinedReply("ORDER-1", "SKU-1"));
 
         bus.Publish(new ReservationReleasedReply("ORDER-1", "SKU-1"));
 
@@ -159,10 +165,71 @@ public class SagaCoordinatorTests
         var bus = new EventBus();
         var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus), new InMemorySagaStateStore());
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
+        bus.Publish(new StockReservedReply("ORDER-1", "SKU-1"));
+        bus.Publish(new PaymentChargedReply("ORDER-1", "SKU-1"));
+        bus.Publish(new ReservationConfirmedReply("ORDER-1", "SKU-1"));
 
         bus.Publish(new ShipmentScheduledReply("ORDER-1", "SKU-1"));
 
         Assert.Equal(SagaStep.Completed, coordinator.GetStep("ORDER-1"));
+    }
+
+    [Fact]
+    public void OnStockReservedReply_RedeliveredAfterSagaAlreadyAdvancedToConfirming_DoesNotRegressStepOrRepublishChargePaymentCommand()
+    {
+        // A stale/duplicate reply (e.g. a redelivered SQS message) arriving after the saga has
+        // already advanced further used to unconditionally overwrite Step -- regressing an
+        // already-advanced saga backward and re-issuing a command that was already issued once.
+        var bus = new EventBus();
+        var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus), new InMemorySagaStateStore());
+        bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
+        bus.Publish(new StockReservedReply("ORDER-1", "SKU-1"));
+        bus.Publish(new PaymentChargedReply("ORDER-1", "SKU-1"));
+        Assert.Equal(SagaStep.Confirming, coordinator.GetStep("ORDER-1"));
+        var republishCount = 0;
+        bus.Subscribe<ChargePaymentCommand>(_ => republishCount++);
+
+        bus.Publish(new StockReservedReply("ORDER-1", "SKU-1"));
+
+        Assert.Equal(SagaStep.Confirming, coordinator.GetStep("ORDER-1"));
+        Assert.Equal(0, republishCount);
+    }
+
+    [Fact]
+    public void OnPaymentChargedReply_RedeliveredAfterSagaAlreadyAdvancedToSchedulingShipment_DoesNotRegressStepOrRepublishConfirmReservationCommand()
+    {
+        var bus = new EventBus();
+        var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus), new InMemorySagaStateStore());
+        bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
+        bus.Publish(new StockReservedReply("ORDER-1", "SKU-1"));
+        bus.Publish(new PaymentChargedReply("ORDER-1", "SKU-1"));
+        bus.Publish(new ReservationConfirmedReply("ORDER-1", "SKU-1"));
+        Assert.Equal(SagaStep.SchedulingShipment, coordinator.GetStep("ORDER-1"));
+        var republishCount = 0;
+        bus.Subscribe<ConfirmReservationCommand>(_ => republishCount++);
+
+        bus.Publish(new PaymentChargedReply("ORDER-1", "SKU-1"));
+
+        Assert.Equal(SagaStep.SchedulingShipment, coordinator.GetStep("ORDER-1"));
+        Assert.Equal(0, republishCount);
+    }
+
+    [Fact]
+    public void OnStockReservationFailedReply_ArrivingAfterSagaAlreadyAdvancedToAwaitingPayment_DoesNotRegressStepToFailed()
+    {
+        // Covers a non-publishing handler: no downstream command to guard, just the Step itself.
+        // A stale StockReservationFailedReply -- whose precondition is ReservingStock -- arriving
+        // after StockReservedReply already advanced the saga to AwaitingPayment must not knock an
+        // in-flight, successfully-reserved saga back to Failed.
+        var bus = new EventBus();
+        var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus), new InMemorySagaStateStore());
+        bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
+        bus.Publish(new StockReservedReply("ORDER-1", "SKU-1"));
+        Assert.Equal(SagaStep.AwaitingPayment, coordinator.GetStep("ORDER-1"));
+
+        bus.Publish(new StockReservationFailedReply("ORDER-1", "SKU-1"));
+
+        Assert.Equal(SagaStep.AwaitingPayment, coordinator.GetStep("ORDER-1"));
     }
 
     [Fact]
@@ -228,7 +295,12 @@ public class SagaCoordinatorTests
             {
                 _raceInjected = true;
                 ConflictsInjected++;
-                await inner.SaveAsync(state with { Step = SagaStep.Failed, Version = expectedVersion + 1 }, expectedVersion, cancellationToken);
+                // Forces Step back to ReservingStock (not state's own already-computed Step, and
+                // not an unrelated step like the old SagaStep.Failed this used to inject) -- the
+                // race must still satisfy the precondition the retried transition checks (see
+                // SagaCoordinator.IfAtStep) so the retry genuinely reapplies the transition, rather
+                // than the reload seeing an already-advanced state and legitimately no-op'ing.
+                await inner.SaveAsync(state with { Step = SagaStep.ReservingStock, Version = expectedVersion + 1 }, expectedVersion, cancellationToken);
                 throw new ConcurrencyConflictException(state.OrderId, expectedVersion, expectedVersion + 1);
             }
 
