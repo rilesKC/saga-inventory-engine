@@ -41,6 +41,23 @@ resource "aws_s3_bucket_public_access_block" "this" {
   restrict_public_buckets = true
 }
 
+# Both buckets have force_destroy = true (needed so `terraform destroy` doesn't fail the way this
+# project's ECR repos once did) -- without versioning, that combination makes an accidental
+# overwrite/delete of an archived event, or a stray bucket recreation, an irreversible loss of the
+# saga's event history. Versioning is what actually makes force_destroy safe to keep.
+resource "aws_s3_bucket_versioning" "this" {
+  for_each = {
+    archive      = aws_s3_bucket.archive.id
+    archive_logs = aws_s3_bucket.archive_logs.id
+  }
+
+  bucket = each.value
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 # Denies any request to this bucket that doesn't use TLS, regardless of caller identity or
 # permissions -- SonarCloud flags a bucket with no policy enforcing this (S3 traffic is otherwise
 # allowed over plain HTTP, exposing archived event/saga-state payloads in transit). Kept as a

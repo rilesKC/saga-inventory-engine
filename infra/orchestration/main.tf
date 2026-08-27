@@ -104,10 +104,15 @@ locals {
         { name = "Sqs__StatelessResponderCommandsQueueUrl", value = module.orchestration_messaging.stateless_responder_commands_queue_url },
         { name = "Sqs__CoordinatorInboundQueueUrl", value = module.orchestration_messaging.coordinator_inbound_queue_url },
         { name = "Dynamo__IdempotencyTableName", value = module.idempotency.table_name },
-        { name = "Mongo__ConnectionString", value = module.persistence.connection_string },
         { name = "Mongo__DatabaseName", value = "orchestration" },
         { name = "Mongo__SagaStateCollectionName", value = "saga-state" },
         { name = "S3__ArchiveBucketName", value = module.persistence.archive_bucket_name },
+      ]
+      secret_environment_variables = [
+        { name = "Mongo__ConnectionString", valueFrom = module.persistence.connection_string_secret_arn },
+      ]
+      task_execution_policy_statements = [
+        { actions = ["secretsmanager:GetSecretValue"], resources = [module.persistence.connection_string_secret_arn] },
       ]
     }
     inventory = {
@@ -139,10 +144,15 @@ locals {
         { name = "Sqs__CoordinatorInboundQueueUrl", value = module.orchestration_messaging.coordinator_inbound_queue_url },
         { name = "Sqs__InventoryCommandsQueueUrl", value = module.orchestration_messaging.inventory_commands_queue_url },
         { name = "Dynamo__IdempotencyTableName", value = module.idempotency.table_name },
-        { name = "Mongo__ConnectionString", value = module.persistence.connection_string },
         { name = "Mongo__DatabaseName", value = "orchestration" },
         { name = "Mongo__InventoryEventsCollectionName", value = "inventory-events" },
         { name = "S3__ArchiveBucketName", value = module.persistence.archive_bucket_name },
+      ]
+      secret_environment_variables = [
+        { name = "Mongo__ConnectionString", valueFrom = module.persistence.connection_string_secret_arn },
+      ]
+      task_execution_policy_statements = [
+        { actions = ["secretsmanager:GetSecretValue"], resources = [module.persistence.connection_string_secret_arn] },
       ]
     }
     responder = {
@@ -171,6 +181,10 @@ locals {
         { name = "Sqs__StatelessResponderCommandsQueueUrl", value = module.orchestration_messaging.stateless_responder_commands_queue_url },
         { name = "Dynamo__IdempotencyTableName", value = module.idempotency.table_name },
       ]
+      # Neither PaymentResponder nor ShippingResponder touches Mongo -- kept empty (not omitted) so
+      # every entry in this map has the same shape, which for_each below requires.
+      secret_environment_variables     = []
+      task_execution_policy_statements = []
     }
   }
 }
@@ -179,26 +193,28 @@ module "iam_and_observability" {
   source   = "../modules/iam-and-observability"
   for_each = local.services
 
-  name                   = "${var.name}-${each.key}"
-  task_policy_statements = each.value.task_policy_statements
+  name                             = "${var.name}-${each.key}"
+  task_policy_statements           = each.value.task_policy_statements
+  task_execution_policy_statements = each.value.task_execution_policy_statements
 }
 
 module "compute" {
   source   = "../modules/compute"
   for_each = local.services
 
-  name                    = "${var.name}-${each.key}"
-  aws_region              = var.aws_region
-  private_subnet_ids      = module.networking.private_subnet_ids
-  app_security_group_id   = each.value.app_security_group_id
-  target_group_arn        = each.value.target_group_arn
-  task_execution_role_arn = module.iam_and_observability[each.key].task_execution_role_arn
-  task_role_arn           = module.iam_and_observability[each.key].task_role_arn
-  ecr_repository_url      = module.iam_and_observability[each.key].ecr_repository_url
-  image_tag               = var.image_tag
-  log_group_name          = module.iam_and_observability[each.key].log_group_name
-  environment_variables   = each.value.environment_variables
-  desired_count           = coalesce(each.value.desired_count, 1)
+  name                         = "${var.name}-${each.key}"
+  aws_region                   = var.aws_region
+  private_subnet_ids           = module.networking.private_subnet_ids
+  app_security_group_id        = each.value.app_security_group_id
+  target_group_arn             = each.value.target_group_arn
+  task_execution_role_arn      = module.iam_and_observability[each.key].task_execution_role_arn
+  task_role_arn                = module.iam_and_observability[each.key].task_role_arn
+  ecr_repository_url           = module.iam_and_observability[each.key].ecr_repository_url
+  image_tag                    = var.image_tag
+  log_group_name               = module.iam_and_observability[each.key].log_group_name
+  environment_variables        = each.value.environment_variables
+  secret_environment_variables = each.value.secret_environment_variables
+  desired_count                = coalesce(each.value.desired_count, 1)
 
   # Real resource/module reference, matching choreography's pattern -- ensures the ALB listener
   # exists before the ECS service tries to register against it. Harmless for inventory/responder,

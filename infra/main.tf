@@ -41,6 +41,9 @@ module "iam_and_observability" {
     { actions = ["dynamodb:PutItem", "dynamodb:DeleteItem"], resources = [module.idempotency.table_arn] },
     { actions = ["s3:PutObject"], resources = ["${module.persistence.archive_bucket_arn}/*"] },
   ]
+  task_execution_policy_statements = [
+    { actions = ["secretsmanager:GetSecretValue"], resources = [module.persistence.connection_string_secret_arn] },
+  ]
 }
 
 module "load_balancer" {
@@ -73,10 +76,13 @@ module "compute" {
   environment_variables = [
     { name = "Sqs__QueueUrl", value = module.messaging.queue_url },
     { name = "EventBridge__BusName", value = module.messaging.event_bus_name },
-    { name = "Mongo__ConnectionString", value = module.persistence.connection_string },
     { name = "Mongo__DatabaseName", value = "inventory" },
     { name = "Mongo__InventoryEventsCollectionName", value = "events" },
     { name = "S3__ArchiveBucketName", value = module.persistence.archive_bucket_name },
+  ]
+
+  secret_environment_variables = [
+    { name = "Mongo__ConnectionString", valueFrom = module.persistence.connection_string_secret_arn },
   ]
 
   # Real resource/module reference, unlike the string-ARN attempt task 17's retro flagged --

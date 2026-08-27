@@ -11,6 +11,15 @@ variable "task_policy_statements" {
   }))
 }
 
+variable "task_execution_policy_statements" {
+  description = "Extra least-privilege IAM policy statements for this service's *execution* role, beyond the standard AmazonECSTaskExecutionRolePolicy (ECR pull, CloudWatch Logs write). Needed for secretsmanager:GetSecretValue on any ARN this service's compute module resolves via secret_environment_variables -- ECS uses the execution role, not the task role, to fetch container secrets at startup. Empty for services with no secrets."
+  type = list(object({
+    actions   = list(string)
+    resources = list(string)
+  }))
+  default = []
+}
+
 variable "log_retention_days" {
   description = "CloudWatch log group retention."
   type        = number

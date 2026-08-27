@@ -1,11 +1,6 @@
-output "connection_string" {
-  description = "Full mongodb+srv connection string, credentials included -- ready to pass straight to MongoClient."
-  value = replace(
-    mongodbatlas_cluster.this.connection_strings[0].standard_srv,
-    "mongodb+srv://",
-    "mongodb+srv://${var.database_user_name}:${random_password.database_user.result}@"
-  )
-  sensitive = true
+output "connection_string_secret_arn" {
+  description = "ARN of the Secrets Manager secret holding the full mongodb+srv connection string (credentials included). Pass to the compute module's secret_environment_variables (ECS's `secrets` block), not as a plain environment_variables entry -- the caller never sees the raw string, only this ARN."
+  value       = aws_secretsmanager_secret.connection_string.arn
 }
 
 output "project_id" {

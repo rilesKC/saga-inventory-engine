@@ -26,6 +26,7 @@ resource "aws_ecs_task_definition" "this" {
         [{ name = "AWS_REGION", value = var.aws_region }],
         var.environment_variables
       )
+      secrets = var.secret_environment_variables
       logConfiguration = {
         logDriver = "awslogs"
         options = {

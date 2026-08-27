@@ -22,6 +22,30 @@ resource "aws_iam_role_policy_attachment" "task_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+# Only created when the caller actually resolves a container secret -- most services here have
+# none, and an empty inline policy document is invalid.
+data "aws_iam_policy_document" "task_execution_extra" {
+  count = length(var.task_execution_policy_statements) > 0 ? 1 : 0
+
+  dynamic "statement" {
+    for_each = var.task_execution_policy_statements
+
+    content {
+      effect    = "Allow"
+      actions   = statement.value.actions
+      resources = statement.value.resources
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "task_execution_extra" {
+  count = length(var.task_execution_policy_statements) > 0 ? 1 : 0
+
+  name   = "${var.name}-task-execution-extra"
+  role   = aws_iam_role.task_execution.id
+  policy = data.aws_iam_policy_document.task_execution_extra[0].json
+}
+
 # Least-privilege application permissions, supplied by the caller as a generic list of statements
 # -- not hardcoded to EventBridge+one-queue+one-table, since orchestration's three services each
 # need a different combination of SQS send/receive/delete and DynamoDB permissions, and none of
