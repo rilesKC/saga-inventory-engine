@@ -22,6 +22,30 @@ public class SagaCoordinatorTests
     }
 
     [Fact]
+    public void OnOrderPlaced_SagaAlreadyExistsForOrderId_DoesNotResetOrRepublish()
+    {
+        // A client retrying POST /orders after a timeout (or a double-click, or a back-button
+        // resubmit) mints a brand-new envelope MessageId each time -- the DynamoDB MessageId-keyed
+        // idempotency store never sees a duplicate, so the coordinator itself is the only thing
+        // that can catch a repeated OrderPlaced for the same OrderId. Before this fix, the second
+        // OrderPlaced reset the saga (even one already Completed) back to ReservingStock and
+        // re-published ReserveStockCommand, re-driving the whole saga -- including a second
+        // ChargePaymentCommand for an order that may already have been paid.
+        var bus = new EventBus();
+        var coordinator = new SagaCoordinator(new InboundEventBus(bus), new OutboundEventBus(bus), new InMemorySagaStateStore());
+        bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
+        bus.Publish(new StockReservedReply("ORDER-1", "SKU-1"));
+        Assert.Equal(SagaStep.AwaitingPayment, coordinator.GetStep("ORDER-1"));
+        var republishCount = 0;
+        bus.Subscribe<ReserveStockCommand>(_ => republishCount++);
+
+        bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
+
+        Assert.Equal(SagaStep.AwaitingPayment, coordinator.GetStep("ORDER-1"));
+        Assert.Equal(0, republishCount);
+    }
+
+    [Fact]
     public void OnStockReservedReply_NoSagaStateForOrder_ThrowsSagaNotFoundException()
     {
         // A reply arriving for an OrderId the coordinator has no persisted SagaState for (e.g. its
