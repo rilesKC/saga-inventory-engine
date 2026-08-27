@@ -21,7 +21,7 @@ public sealed class SqsMessageProcessor : IMessageProcessor
         _idempotencyStore = idempotencyStore;
     }
 
-    public async Task ProcessMessageAsync(string rawBody, CancellationToken cancellationToken)
+    public async Task<bool> ProcessMessageAsync(string rawBody, CancellationToken cancellationToken)
     {
         // The raw SQS message body is the full EventBridge event structure (version, id,
         // detail-type, source, account, time, region, detail, ...), not our EventEnvelope
@@ -35,7 +35,9 @@ public sealed class SqsMessageProcessor : IMessageProcessor
 
         if (!await _idempotencyStore.TryClaimAsync(envelope.MessageId, cancellationToken))
         {
-            return;
+            // Another delivery already holds (or held) this claim -- this delivery did nothing, so
+            // the caller must not delete the SQS message on our account. See IMessageProcessor.
+            return false;
         }
 
         try
@@ -60,5 +62,7 @@ public sealed class SqsMessageProcessor : IMessageProcessor
             await _idempotencyStore.ReleaseAsync(envelope.MessageId, cancellationToken);
             throw;
         }
+
+        return true;
     }
 }

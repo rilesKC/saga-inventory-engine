@@ -20,7 +20,7 @@ public class SqsMessageProcessorTests
     });
 
     [Fact]
-    public async Task ProcessMessageAsync_NewEnvelope_ClaimsAndDispatchesToEventBus()
+    public async Task ProcessMessageAsync_NewEnvelope_ClaimsDispatchesAndReturnsTrue()
     {
         var bus = new EventBus();
         var idempotencyStore = new InMemoryIdempotencyStore();
@@ -29,15 +29,21 @@ public class SqsMessageProcessorTests
         bus.Subscribe<OrderPlaced>(e => dispatched = e);
         var envelope = EventTypeRegistry.Serialize(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
 
-        await processor.ProcessMessageAsync(ToRawBody(envelope), CancellationToken.None);
+        var result = await processor.ProcessMessageAsync(ToRawBody(envelope), CancellationToken.None);
 
+        Assert.True(result, "a genuinely-processed message must return true so SqsPollingBackgroundService deletes it");
         Assert.NotNull(dispatched);
         Assert.Equal("ORDER-1", dispatched.OrderId);
     }
 
     [Fact]
-    public async Task ProcessMessageAsync_DuplicateMessageId_SkipsDispatch()
+    public async Task ProcessMessageAsync_DuplicateMessageId_SkipsDispatchAndReturnsFalse()
     {
+        // false, not true, matters beyond "don't dispatch twice": SqsPollingBackgroundService only
+        // deletes the SQS message when this returns true. If a redelivered/concurrent copy of a
+        // message still being processed by another delivery returned true here, that copy would
+        // delete the message out from under the delivery that actually holds the claim -- if that
+        // delivery later fails and expects a redelivery to retry, the message would already be gone.
         var bus = new EventBus();
         var idempotencyStore = new InMemoryIdempotencyStore();
         var processor = new SqsMessageProcessor(bus, idempotencyStore);
@@ -45,10 +51,12 @@ public class SqsMessageProcessorTests
         bus.Subscribe<OrderPlaced>(_ => dispatchCount++);
         var envelope = EventTypeRegistry.Serialize(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
         var rawBody = ToRawBody(envelope);
-        await processor.ProcessMessageAsync(rawBody, CancellationToken.None);
+        var firstResult = await processor.ProcessMessageAsync(rawBody, CancellationToken.None);
 
-        await processor.ProcessMessageAsync(rawBody, CancellationToken.None);
+        var secondResult = await processor.ProcessMessageAsync(rawBody, CancellationToken.None);
 
+        Assert.True(firstResult);
+        Assert.False(secondResult);
         Assert.Equal(1, dispatchCount);
     }
 
@@ -74,8 +82,9 @@ public class SqsMessageProcessorTests
         OrderPlaced? dispatched = null;
         healthyBus.Subscribe<OrderPlaced>(e => dispatched = e);
         var retryProcessor = new SqsMessageProcessor(healthyBus, idempotencyStore);
-        await retryProcessor.ProcessMessageAsync(rawBody, CancellationToken.None);
+        var retryResult = await retryProcessor.ProcessMessageAsync(rawBody, CancellationToken.None);
 
+        Assert.True(retryResult);
         Assert.NotNull(dispatched);
         Assert.Equal("ORDER-1", dispatched.OrderId);
     }

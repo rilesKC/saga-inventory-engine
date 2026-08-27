@@ -9,5 +9,11 @@ namespace OrderSaga.Aws;
 /// </summary>
 public interface IMessageProcessor
 {
-    Task ProcessMessageAsync(string rawBody, CancellationToken cancellationToken);
+    /// <summary>
+    /// Returns true if this delivery genuinely processed (claimed and dispatched) the message --
+    /// SqsPollingBackgroundService deletes the SQS message only when this is true. Returns false
+    /// when another delivery already holds (or held) the idempotency claim: this delivery did
+    /// nothing, so it must not delete a message a concurrent delivery may still be working on.
+    /// </summary>
+    Task<bool> ProcessMessageAsync(string rawBody, CancellationToken cancellationToken);
 }

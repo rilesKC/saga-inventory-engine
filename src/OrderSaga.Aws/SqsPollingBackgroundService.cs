@@ -56,12 +56,22 @@ public sealed class SqsPollingBackgroundService : BackgroundService
                 {
                     try
                     {
-                        await _processor.ProcessMessageAsync(message.Body, stoppingToken);
-                        processed.Add(new DeleteMessageBatchRequestEntry
+                        // false means another delivery already holds (or held) the idempotency
+                        // claim -- this delivery did nothing, so it must not delete the message.
+                        // If the actual claim-holder already succeeded, that delivery's own
+                        // iteration already deleted it; if the claim-holder is still processing,
+                        // deleting here would remove the message out from under it -- and if that
+                        // delivery later fails and expects a redelivery to retry, the message would
+                        // already be gone. Leave this copy alone and let its own visibility timeout
+                        // expire naturally.
+                        if (await _processor.ProcessMessageAsync(message.Body, stoppingToken))
                         {
-                            Id = message.MessageId,
-                            ReceiptHandle = message.ReceiptHandle,
-                        });
+                            processed.Add(new DeleteMessageBatchRequestEntry
+                            {
+                                Id = message.MessageId,
+                                ReceiptHandle = message.ReceiptHandle,
+                            });
+                        }
                     }
                     catch (Exception ex)
                     {
