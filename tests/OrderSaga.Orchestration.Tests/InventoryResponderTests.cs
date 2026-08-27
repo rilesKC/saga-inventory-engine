@@ -88,6 +88,49 @@ public class InventoryResponderTests
     }
 
     [Fact]
+    public async Task OnConfirmReservationCommand_RedeliveredAfterAlreadyConfirmed_StillPublishesReservationConfirmedReply()
+    {
+        // Unlike choreography (fire-and-forget events), orchestration's command/reply model
+        // requires a reply for every command -- SagaCoordinator is waiting on one. A redelivered
+        // ConfirmReservationCommand for an order already Confirmed must still get its
+        // ReservationConfirmedReply, not a silent no-op (which would stall the saga) or an uncaught
+        // InvalidReservationStateException (which would crash message processing).
+        var bus = new EventBus();
+        var eventStore = await SeedAsync("SKU-1", 10);
+        await eventStore.AppendRangeAsync("SKU-1", 1, [new StockReserved("SKU-1", "ORDER-1", 4, 199.99m)], CancellationToken.None);
+        await eventStore.AppendRangeAsync("SKU-1", 2, [new ReservationConfirmed("SKU-1", "ORDER-1", 4)], CancellationToken.None);
+        _ = new InventoryResponder(new InboundEventBus(bus), new OutboundEventBus(bus), eventStore);
+        ReservationConfirmedReply? published = null;
+        bus.Subscribe<ReservationConfirmedReply>(e => published = e);
+
+        var exception = Record.Exception(() => bus.Publish(new ConfirmReservationCommand("ORDER-1", "SKU-1")));
+
+        Assert.Null(exception);
+        Assert.NotNull(published);
+        Assert.Equal("SKU-1", published.Sku);
+        Assert.Equal("ORDER-1", published.OrderId);
+    }
+
+    [Fact]
+    public async Task OnReleaseReservationCommand_RedeliveredAfterAlreadyReleased_StillPublishesReservationReleasedReply()
+    {
+        var bus = new EventBus();
+        var eventStore = await SeedAsync("SKU-1", 10);
+        await eventStore.AppendRangeAsync("SKU-1", 1, [new StockReserved("SKU-1", "ORDER-1", 4, 199.99m)], CancellationToken.None);
+        await eventStore.AppendRangeAsync("SKU-1", 2, [new ReservationReleased("SKU-1", "ORDER-1", 4)], CancellationToken.None);
+        _ = new InventoryResponder(new InboundEventBus(bus), new OutboundEventBus(bus), eventStore);
+        ReservationReleasedReply? published = null;
+        bus.Subscribe<ReservationReleasedReply>(e => published = e);
+
+        var exception = Record.Exception(() => bus.Publish(new ReleaseReservationCommand("ORDER-1", "SKU-1")));
+
+        Assert.Null(exception);
+        Assert.NotNull(published);
+        Assert.Equal("SKU-1", published.Sku);
+        Assert.Equal("ORDER-1", published.OrderId);
+    }
+
+    [Fact]
     public async Task OnReserveStockCommand_SuccessfulReservation_AppendsStockReservedToEventStore()
     {
         var bus = new EventBus();

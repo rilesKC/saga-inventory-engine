@@ -47,13 +47,33 @@ public sealed class InventoryParticipant
         }
     }
 
-    private void OnPaymentCharged(PaymentCharged paymentCharged) =>
-        ApplyWithRetry(paymentCharged.Sku, item =>
-            item.Handle(new ConfirmReservation(paymentCharged.Sku, paymentCharged.OrderId)));
+    private void OnPaymentCharged(PaymentCharged paymentCharged)
+    {
+        try
+        {
+            ApplyWithRetry(paymentCharged.Sku, item =>
+                item.Handle(new ConfirmReservation(paymentCharged.Sku, paymentCharged.OrderId)));
+        }
+        catch (InvalidReservationStateException)
+        {
+            // Redelivered/duplicate PaymentCharged for an order already Confirmed or Released --
+            // no further action needed either way; choreography has no reply to send (unlike
+            // orchestration's InventoryResponder, which must always answer its caller).
+        }
+    }
 
-    private void OnPaymentDeclined(PaymentDeclined paymentDeclined) =>
-        ApplyWithRetry(paymentDeclined.Sku, item =>
-            item.Handle(new ReleaseReservation(paymentDeclined.Sku, paymentDeclined.OrderId)));
+    private void OnPaymentDeclined(PaymentDeclined paymentDeclined)
+    {
+        try
+        {
+            ApplyWithRetry(paymentDeclined.Sku, item =>
+                item.Handle(new ReleaseReservation(paymentDeclined.Sku, paymentDeclined.OrderId)));
+        }
+        catch (InvalidReservationStateException)
+        {
+            // Redelivered/duplicate PaymentDeclined for an order already Confirmed or Released.
+        }
+    }
 
     /// <summary>
     /// Reloads InventoryItem from the durable event log, applies the mutation, and appends the

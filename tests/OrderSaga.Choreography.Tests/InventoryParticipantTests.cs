@@ -90,6 +90,38 @@ public class InventoryParticipantTests
     }
 
     [Fact]
+    public async Task OnPaymentCharged_RedeliveredAfterAlreadyConfirmed_DoesNotThrow()
+    {
+        // A redelivered/duplicate PaymentCharged for an order already Confirmed (or Released) must
+        // be a safe no-op, not an uncaught InvalidReservationStateException crashing message
+        // processing -- the same redelivery-safety guarantee OnOrderPlaced already has via its
+        // InsufficientStockException catch.
+        var bus = new EventBus();
+        var eventStore = await SeedAsync("SKU-1", 10);
+        await eventStore.AppendRangeAsync("SKU-1", 1, [new StockReserved("SKU-1", "ORDER-1", 4, 199.99m)], CancellationToken.None);
+        await eventStore.AppendRangeAsync("SKU-1", 2, [new ReservationConfirmed("SKU-1", "ORDER-1", 4)], CancellationToken.None);
+        _ = new InventoryParticipant(new InboundEventBus(bus), new OutboundEventBus(bus), eventStore);
+
+        var exception = Record.Exception(() => bus.Publish(new PaymentCharged("ORDER-1", "SKU-1", 199.99m)));
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public async Task OnPaymentDeclined_RedeliveredAfterAlreadyReleased_DoesNotThrow()
+    {
+        var bus = new EventBus();
+        var eventStore = await SeedAsync("SKU-1", 10);
+        await eventStore.AppendRangeAsync("SKU-1", 1, [new StockReserved("SKU-1", "ORDER-1", 4, 199.99m)], CancellationToken.None);
+        await eventStore.AppendRangeAsync("SKU-1", 2, [new ReservationReleased("SKU-1", "ORDER-1", 4)], CancellationToken.None);
+        _ = new InventoryParticipant(new InboundEventBus(bus), new OutboundEventBus(bus), eventStore);
+
+        var exception = Record.Exception(() => bus.Publish(new PaymentDeclined("ORDER-1", "SKU-1", 199.99m)));
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
     public async Task OnOrderPlaced_SuccessfulReservation_AppendsStockReservedToEventStore()
     {
         var bus = new EventBus();
