@@ -24,14 +24,16 @@ public sealed class SqsMessageProcessor : IMessageProcessor
         _idempotencyStore = idempotencyStore;
     }
 
-    public async Task ProcessMessageAsync(string rawBody, CancellationToken cancellationToken)
+    public async Task<bool> ProcessMessageAsync(string rawBody, CancellationToken cancellationToken)
     {
         var envelope = JsonSerializer.Deserialize<MessageEnvelope>(rawBody)
             ?? throw new InvalidOperationException("SQS message body did not deserialize to a MessageEnvelope.");
 
         if (!await _idempotencyStore.TryClaimAsync(envelope.MessageId, cancellationToken))
         {
-            return;
+            // Another delivery already holds (or held) this claim -- this delivery did nothing, so
+            // the caller must not delete the SQS message on our account. See IMessageProcessor.
+            return false;
         }
 
         try
@@ -53,5 +55,7 @@ public sealed class SqsMessageProcessor : IMessageProcessor
             await _idempotencyStore.ReleaseAsync(envelope.MessageId, cancellationToken);
             throw;
         }
+
+        return true;
     }
 }

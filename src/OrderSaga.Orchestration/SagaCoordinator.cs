@@ -50,10 +50,26 @@ public sealed class SagaCoordinator
 
     private void OnOrderPlaced(OrderPlaced orderPlaced)
     {
-        ApplyWithRetry(orderPlaced.OrderId, _ => new SagaState(
+        // No client-supplied idempotency key exists at the HTTP intake layer, so a plain retried
+        // POST /orders (a timeout, a double-click, a back-button resubmit) mints a brand-new
+        // envelope MessageId and sails straight past the transport-level idempotency store -- this
+        // handler is the only thing that can still catch a duplicate OrderPlaced for an OrderId
+        // that already has a saga. `alreadyExists` gates the *publish* (a best-effort check, since
+        // a genuinely concurrent duplicate could still race past it -- the downstream
+        // InventoryResponder's own OrderId dedup absorbs that narrow case harmlessly). The
+        // transition passed to ApplyWithRetry is what makes the *stored state* safe unconditionally:
+        // `current ?? new SagaState(...)` never overwrites an existing saga even under a genuine
+        // race, so an already-in-flight or already-completed order can never be reset back to
+        // ReservingStock.
+        var alreadyExists = _store.TryLoadAsync(orderPlaced.OrderId, CancellationToken.None).GetAwaiter().GetResult() is not null;
+
+        ApplyWithRetry(orderPlaced.OrderId, current => current ?? new SagaState(
             orderPlaced.OrderId, orderPlaced.Sku, orderPlaced.Quantity, orderPlaced.Amount, SagaStep.ReservingStock));
 
-        _outbound.Publish(new ReserveStockCommand(orderPlaced.OrderId, orderPlaced.Sku, orderPlaced.Quantity, orderPlaced.Amount));
+        if (!alreadyExists)
+        {
+            _outbound.Publish(new ReserveStockCommand(orderPlaced.OrderId, orderPlaced.Sku, orderPlaced.Quantity, orderPlaced.Amount));
+        }
     }
 
     private void OnStockReservedReply(StockReservedReply reply)
