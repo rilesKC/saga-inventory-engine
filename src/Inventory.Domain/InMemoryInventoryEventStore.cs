@@ -8,7 +8,9 @@ namespace Inventory.Domain;
 /// </summary>
 public sealed class InMemoryInventoryEventStore : IInventoryEventStore
 {
-    private readonly ConcurrentDictionary<string, List<object>> _eventsBySku = new();
+    private sealed record StoredEvent(object Event, bool Published);
+
+    private readonly ConcurrentDictionary<string, List<StoredEvent>> _eventsBySku = new();
 
     public Task AppendRangeAsync(string sku, int expectedEventCount, IReadOnlyList<object> events, CancellationToken cancellationToken)
     {
@@ -25,7 +27,7 @@ public sealed class InMemoryInventoryEventStore : IInventoryEventStore
                 throw new ConcurrencyConflictException(sku, expectedEventCount, list.Count);
             }
 
-            list.AddRange(events);
+            list.AddRange(events.Select(e => new StoredEvent(e, Published: false)));
         }
 
         return Task.CompletedTask;
@@ -40,7 +42,41 @@ public sealed class InMemoryInventoryEventStore : IInventoryEventStore
 
         lock (list)
         {
-            return Task.FromResult<IReadOnlyList<object>>(list.ToArray());
+            return Task.FromResult<IReadOnlyList<object>>(list.Select(e => e.Event).ToArray());
         }
+    }
+
+    public Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken)
+    {
+        var pending = new List<PendingOutboxEntry>();
+
+        foreach (var (sku, list) in _eventsBySku)
+        {
+            lock (list)
+            {
+                for (var i = 0; i < list.Count; i++)
+                {
+                    if (!list[i].Published)
+                    {
+                        pending.Add(new PendingOutboxEntry(sku, i, list[i].Event));
+                    }
+                }
+            }
+        }
+
+        return Task.FromResult<IReadOnlyList<PendingOutboxEntry>>(pending);
+    }
+
+    public Task MarkPublishedAsync(string sku, int sequence, CancellationToken cancellationToken)
+    {
+        if (_eventsBySku.TryGetValue(sku, out var list))
+        {
+            lock (list)
+            {
+                list[sequence] = list[sequence] with { Published = true };
+            }
+        }
+
+        return Task.CompletedTask;
     }
 }

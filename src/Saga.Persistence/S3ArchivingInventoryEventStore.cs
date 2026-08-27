@@ -46,4 +46,10 @@ public sealed class S3ArchivingInventoryEventStore : IInventoryEventStore
 
     public Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken) =>
         _inner.LoadEventsAsync(sku, cancellationToken);
+
+    public Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken) =>
+        _inner.LoadUnpublishedAsync(cancellationToken);
+
+    public Task MarkPublishedAsync(string sku, int sequence, CancellationToken cancellationToken) =>
+        _inner.MarkPublishedAsync(sku, sequence, cancellationToken);
 }

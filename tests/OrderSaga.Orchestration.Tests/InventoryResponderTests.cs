@@ -194,6 +194,12 @@ public class InventoryResponderTests
 
         public Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken) =>
             inner.LoadEventsAsync(sku, cancellationToken);
+
+        public Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken) =>
+            inner.LoadUnpublishedAsync(cancellationToken);
+
+        public Task MarkPublishedAsync(string sku, int sequence, CancellationToken cancellationToken) =>
+            inner.MarkPublishedAsync(sku, sequence, cancellationToken);
     }
 
     [Fact]
@@ -227,5 +233,11 @@ public class InventoryResponderTests
 
         public Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken) =>
             inner.LoadEventsAsync(sku, cancellationToken);
+
+        public Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken) =>
+            inner.LoadUnpublishedAsync(cancellationToken);
+
+        public Task MarkPublishedAsync(string sku, int sequence, CancellationToken cancellationToken) =>
+            inner.MarkPublishedAsync(sku, sequence, cancellationToken);
     }
 }

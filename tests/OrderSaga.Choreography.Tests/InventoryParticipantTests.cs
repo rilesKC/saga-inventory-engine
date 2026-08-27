@@ -13,8 +13,13 @@ public class InventoryParticipantTests
     }
 
     [Fact]
-    public async Task OnOrderPlaced_WithSufficientStock_PublishesStockReserved()
+    public async Task OnOrderPlaced_WithSufficientStock_AppendsStockReservedAsPendingOutboxEntryWithoutPublishingSynchronously()
     {
+        // Publishing is now the outbox drainer's job, decoupled from this synchronous
+        // command-handling path (see OutboxDrainerBackgroundService) -- a durable append that
+        // succeeds but a synchronous publish that doesn't (crash, transient failure) used to lose
+        // the event forever, since a redelivery's Handle() call sees the reservation already
+        // exists and returns zero new events, skipping the old inline publish loop entirely.
         var bus = new EventBus();
         var eventStore = await SeedAsync("SKU-1", 10);
         _ = new InventoryParticipant(new InboundEventBus(bus), new OutboundEventBus(bus), eventStore);
@@ -23,11 +28,13 @@ public class InventoryParticipantTests
 
         bus.Publish(new OrderPlaced("ORDER-1", "SKU-1", 4, 199.99m));
 
-        Assert.NotNull(published);
-        Assert.Equal("SKU-1", published.Sku);
-        Assert.Equal("ORDER-1", published.OrderId);
-        Assert.Equal(4, published.Quantity);
-        Assert.Equal(199.99m, published.Amount);
+        Assert.Null(published);
+        var pending = await eventStore.LoadUnpublishedAsync(CancellationToken.None);
+        var stockReserved = Assert.IsType<StockReserved>(Assert.Single(pending, e => e.Event is StockReserved).Event);
+        Assert.Equal("SKU-1", stockReserved.Sku);
+        Assert.Equal("ORDER-1", stockReserved.OrderId);
+        Assert.Equal(4, stockReserved.Quantity);
+        Assert.Equal(199.99m, stockReserved.Amount);
         var item = InventoryItem.LoadFromHistory(await eventStore.LoadEventsAsync("SKU-1", CancellationToken.None));
         Assert.Equal(6, item.AvailableQuantity);
     }
@@ -51,7 +58,7 @@ public class InventoryParticipantTests
     }
 
     [Fact]
-    public async Task OnPaymentCharged_ConfirmsReservationAndPublishesReservationConfirmed()
+    public async Task OnPaymentCharged_ConfirmsReservationAndAppendsReservationConfirmedAsPendingOutboxEntryWithoutPublishingSynchronously()
     {
         var bus = new EventBus();
         var eventStore = await SeedAsync("SKU-1", 10);
@@ -62,16 +69,18 @@ public class InventoryParticipantTests
 
         bus.Publish(new PaymentCharged("ORDER-1", "SKU-1", 199.99m));
 
-        Assert.NotNull(published);
-        Assert.Equal("SKU-1", published.Sku);
-        Assert.Equal("ORDER-1", published.OrderId);
+        Assert.Null(published);
+        var pending = await eventStore.LoadUnpublishedAsync(CancellationToken.None);
+        var reservationConfirmed = Assert.IsType<ReservationConfirmed>(Assert.Single(pending, e => e.Event is ReservationConfirmed).Event);
+        Assert.Equal("SKU-1", reservationConfirmed.Sku);
+        Assert.Equal("ORDER-1", reservationConfirmed.OrderId);
         var item = InventoryItem.LoadFromHistory(await eventStore.LoadEventsAsync("SKU-1", CancellationToken.None));
         Assert.Equal(4, item.DeductedQuantity);
         Assert.Equal(0, item.ReservedQuantity);
     }
 
     [Fact]
-    public async Task OnPaymentDeclined_ReleasesReservationAndPublishesReservationReleased()
+    public async Task OnPaymentDeclined_ReleasesReservationAndAppendsReservationReleasedAsPendingOutboxEntryWithoutPublishingSynchronously()
     {
         var bus = new EventBus();
         var eventStore = await SeedAsync("SKU-1", 10);
@@ -82,9 +91,11 @@ public class InventoryParticipantTests
 
         bus.Publish(new PaymentDeclined("ORDER-1", "SKU-1", 199.99m));
 
-        Assert.NotNull(published);
-        Assert.Equal("SKU-1", published.Sku);
-        Assert.Equal("ORDER-1", published.OrderId);
+        Assert.Null(published);
+        var pending = await eventStore.LoadUnpublishedAsync(CancellationToken.None);
+        var reservationReleased = Assert.IsType<ReservationReleased>(Assert.Single(pending, e => e.Event is ReservationReleased).Event);
+        Assert.Equal("SKU-1", reservationReleased.Sku);
+        Assert.Equal("ORDER-1", reservationReleased.OrderId);
         var item = InventoryItem.LoadFromHistory(await eventStore.LoadEventsAsync("SKU-1", CancellationToken.None));
         Assert.Equal(10, item.AvailableQuantity);
     }
@@ -207,6 +218,12 @@ public class InventoryParticipantTests
 
         public Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken) =>
             inner.LoadEventsAsync(sku, cancellationToken);
+
+        public Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken) =>
+            inner.LoadUnpublishedAsync(cancellationToken);
+
+        public Task MarkPublishedAsync(string sku, int sequence, CancellationToken cancellationToken) =>
+            inner.MarkPublishedAsync(sku, sequence, cancellationToken);
     }
 
     /// <summary>
@@ -225,5 +242,11 @@ public class InventoryParticipantTests
 
         public Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken) =>
             inner.LoadEventsAsync(sku, cancellationToken);
+
+        public Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken) =>
+            inner.LoadUnpublishedAsync(cancellationToken);
+
+        public Task MarkPublishedAsync(string sku, int sequence, CancellationToken cancellationToken) =>
+            inner.MarkPublishedAsync(sku, sequence, cancellationToken);
     }
 }
