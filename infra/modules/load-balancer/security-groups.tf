@@ -1,11 +1,18 @@
 resource "aws_security_group" "alb" {
   name        = "${var.name}-alb"
-  description = "Allows inbound HTTP from the internet to the ALB."
+  description = "Allows inbound HTTP/HTTPS from the internet to the ALB. HTTP is a redirect-to-HTTPS listener only -- see aws_lb_listener.http."
   vpc_id      = var.vpc_id
 
   ingress {
     from_port   = 80
     to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }

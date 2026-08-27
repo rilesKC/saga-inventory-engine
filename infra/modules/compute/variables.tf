@@ -51,6 +51,15 @@ variable "environment_variables" {
   default = []
 }
 
+variable "secret_environment_variables" {
+  description = "Container secrets resolved from AWS Secrets Manager/SSM at container start (ECS's `secrets` block), for values that must never appear in plain text in the task definition -- credentials, connection strings. The task execution role must be granted secretsmanager:GetSecretValue on each valueFrom ARN (see iam-and-observability's task_execution_policy_statements)."
+  type = list(object({
+    name      = string
+    valueFrom = string
+  }))
+  default = []
+}
+
 variable "app_port" {
   type    = number
   default = 8080
