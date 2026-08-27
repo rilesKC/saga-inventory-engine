@@ -151,9 +151,6 @@ _ = app.Services.GetRequiredService<OutboundEventForwarder>();
 app.MapGet("/health", () => Results.Ok());
 
 app.MapPost("/orders", (PlaceOrderRequest request, OrderIntakeHandler handler) =>
-{
-    handler.Handle(request);
-    return Results.Accepted();
-});
+    handler.Handle(request) ? Results.Accepted() : Results.BadRequest());
 
 app.Run();
