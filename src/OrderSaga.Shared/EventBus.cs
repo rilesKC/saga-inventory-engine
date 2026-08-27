@@ -48,6 +48,17 @@ public sealed class EventBus
         }
         finally
         {
+            // A handler exception aborts this while loop mid-way, potentially leaving events that
+            // other handlers already enqueued (via their own nested Publish calls) still sitting in
+            // _pending. Left uncleared, the next unrelated Publish call on this bus -- a singleton
+            // for the host's lifetime in production -- would dequeue and dispatch them mixed into
+            // that call's own dispatch cycle: side effects for this failed dispatch firing at the
+            // wrong time, attributed to the wrong message. The caller that triggered this Publish
+            // (SqsMessageProcessor) already treats any exception as "release the claim, redeliver
+            // the whole message", which regenerates these same nested events from scratch -- so
+            // discarding them here is correct, not just safe. On the normal, non-exception path
+            // _pending is already empty by this point, so this is a no-op.
+            _pending.Clear();
             _isDispatching = false;
         }
     }
