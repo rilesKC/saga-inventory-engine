@@ -255,3 +255,34 @@ legibility (see "Where does 'saga progress' live?" above) at the cost of a new, 
 failure mode that choreography's design doesn't have room for in the first place. Fixed by
 generalizing the coordinator's own retry-transition delegate to allow a no-op (the same idiom the
 Inventory-side `ApplyWithRetry`s already used) plus a shared step-precondition guard.
+
+## Now that observability is real too
+
+Both stacks got instrumented with New Relic APM, including manual distributed tracing across the
+message-queue boundaries the agent can't auto-instrument (see `docs/specs/` isn't the right place
+for this one — it wasn't spec-driven; it was a direct response to a target role's stated stack).
+The interesting part isn't the APM setup itself (identical NuGet package, identical Dockerfile env
+vars, identical Terraform wiring, on all four services) — it's what tracing revealed about the
+outbox pattern the last section just finished describing.
+
+### The outbox pattern has a tracing cost neither section above priced in
+
+Choreography's `InventoryParticipant` durably appends an event, then a separate background
+service (`OutboxDrainerBackgroundService`) publishes it later, on its own timer — that's the whole
+point of the outbox fix two sections up, decoupling the publish from the original request so a
+crash between the two can't lose the event. But it means the transaction that originally caused
+the event (an HTTP request, or an earlier message's processing) has already *ended* by the time
+the drainer gets around to publishing. A distributed trace literally cannot span that gap without
+lying about timing, so the drainer gets its own transaction instead of faking a continuation.
+
+Orchestration has no outbox — every one of its `InventoryResponder` handlers publishes a reply
+synchronously, in the same transaction that received the command, because that reply's whole job
+is to unblock `SagaCoordinator`, which is still waiting. So orchestration's traces stay unbroken
+end to end, choreography's don't past the first drain cycle. The same reliability fix that makes
+choreography's event delivery durable is exactly what makes its own tracing discontinuous — a
+tradeoff neither the original comparison nor the outbox-pattern section predicted, because neither
+was asking "what does this do to observability" at the time. Verified live: the specific number
+that proved trace continuity was working (message consumptions that started their own independent
+trace, rather than joining their publisher's) dropped from 3 to 0 as the deployment's startup
+window aged out of the lookback — every steady-state message after that successfully joined an
+existing trace, confirming the boundary is exactly where the outbox sits and nowhere else.
