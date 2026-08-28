@@ -7,6 +7,10 @@
 resource "aws_secretsmanager_secret" "new_relic_license_key" {
   name        = "${var.name}-new-relic-license-key"
   description = "New Relic license key for ${var.name}'s APM instrumentation."
+
+  # See modules/persistence/secrets.tf's connection_string secret for why this is 0, not the
+  # 30-day default -- this project deploys/tears down repeatedly by design.
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "new_relic_license_key" {

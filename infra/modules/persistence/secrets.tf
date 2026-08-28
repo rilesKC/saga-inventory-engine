@@ -8,6 +8,13 @@
 resource "aws_secretsmanager_secret" "connection_string" {
   name        = "${var.project_name}-mongo-connection-string"
   description = "MongoDB Atlas connection string (credentials included) for ${var.project_name}."
+
+  # This project deploys for real, verifies, and tears down repeatedly by design -- Secrets
+  # Manager's default 30-day recovery window means a `terraform destroy` doesn't actually free the
+  # secret's name, so a later `terraform apply` reusing the same name fails with "already scheduled
+  # for deletion" until that window elapses. Found live, on the second full deploy/destroy/deploy
+  # cycle against this exact secret name.
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "connection_string" {
