@@ -43,6 +43,7 @@ module "iam_and_observability" {
   ]
   task_execution_policy_statements = [
     { actions = ["secretsmanager:GetSecretValue"], resources = [module.persistence.connection_string_secret_arn] },
+    { actions = ["secretsmanager:GetSecretValue"], resources = [aws_secretsmanager_secret.new_relic_license_key.arn] },
   ]
 }
 
@@ -79,10 +80,13 @@ module "compute" {
     { name = "Mongo__DatabaseName", value = "inventory" },
     { name = "Mongo__InventoryEventsCollectionName", value = "events" },
     { name = "S3__ArchiveBucketName", value = module.persistence.archive_bucket_name },
+    # New Relic's own literal env var name, not a .NET config key -- no double-underscore.
+    { name = "NEW_RELIC_APP_NAME", value = var.name },
   ]
 
   secret_environment_variables = [
     { name = "Mongo__ConnectionString", valueFrom = module.persistence.connection_string_secret_arn },
+    { name = "NEW_RELIC_LICENSE_KEY", valueFrom = aws_secretsmanager_secret.new_relic_license_key.arn },
   ]
 
   # Real resource/module reference, unlike the string-ARN attempt task 17's retro flagged --

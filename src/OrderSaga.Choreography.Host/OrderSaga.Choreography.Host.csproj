@@ -20,6 +20,8 @@
     <PackageReference Include="AWSSDK.S3" Version="4.0.102.4" />
     <PackageReference Include="AWSSDK.SQS" Version="4.0.100.10" />
     <PackageReference Include="MongoDB.Driver" Version="3.11.0" />
+    <PackageReference Include="NewRelic.Agent" Version="10.54.0" />
+    <PackageReference Include="NewRelic.Agent.Api" Version="10.54.0" />
   </ItemGroup>
 
 </Project>

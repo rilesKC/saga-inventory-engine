@@ -1,4 +1,5 @@
 using System.Text.Json;
+using NewRelic.Api.Agent;
 using OrderSaga.Aws;
 using OrderSaga.Shared;
 
@@ -21,6 +22,11 @@ public sealed class SqsMessageProcessor : IMessageProcessor
         _idempotencyStore = idempotencyStore;
     }
 
+    // One New Relic transaction per SQS message processed -- gives EventTypeRegistry.Deserialize's
+    // AcceptDistributedTraceHeaders call something to attach the producer's trace context to. Must
+    // sit on this concrete method, not IMessageProcessor's interface member -- the [Transaction]
+    // attribute is documented as not applying through an interface.
+    [Transaction]
     public async Task<bool> ProcessMessageAsync(string rawBody, CancellationToken cancellationToken)
     {
         // The raw SQS message body is the full EventBridge event structure (version, id,

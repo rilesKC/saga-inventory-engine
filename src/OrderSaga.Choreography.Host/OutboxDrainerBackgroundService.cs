@@ -1,6 +1,7 @@
 using Inventory.Domain;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using NewRelic.Api.Agent;
 
 namespace OrderSaga.Choreography.Host;
 
@@ -47,6 +48,17 @@ public sealed class OutboxDrainerBackgroundService : BackgroundService
         }
     }
 
+    // A real, honest tracing limitation, not a bug: this publish happens on this background
+    // service's own timer, decoupled from whatever request originally caused the event to be
+    // appended to the outbox -- by the time a drain cycle runs, that original transaction has
+    // already ended. A trace literally can't span that gap without lying about timing, since the
+    // whole point of the outbox pattern is to decouple the publish from the original transaction's
+    // lifetime. [Transaction] here gives the drain cycle itself its own visible New Relic
+    // transaction (so drain activity isn't invisible) rather than attempting to fake-continue a
+    // trace that's already over. Orchestration has no outbox, so every one of its hops keeps an
+    // unbroken trace -- this asymmetry is worth remembering as one more consequence of the same
+    // choreography-vs-orchestration tradeoff this project's own comparison doc already tracks.
+    [Transaction]
     public async Task DrainOnceAsync(CancellationToken cancellationToken)
     {
         var pending = await _eventStore.LoadUnpublishedAsync(cancellationToken);

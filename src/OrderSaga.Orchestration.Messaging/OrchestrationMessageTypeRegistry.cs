@@ -1,4 +1,5 @@
 using System.Text.Json;
+using NewRelic.Api.Agent;
 using OrderSaga.Orchestration;
 using OrderSaga.Shared;
 
@@ -39,17 +40,43 @@ public static class OrchestrationMessageTypeRegistry
     /// </summary>
     public static IReadOnlyCollection<Type> KnownMessageTypes => TypesByName.Values;
 
+    /// <summary>
+    /// Producer-side half of manual distributed tracing across the direct-SQS hop -- see
+    /// OrderSaga.Choreography.Host.EventTypeRegistry.Serialize's doc comment for the full
+    /// reasoning (identical here, just choreography's EventBridge hop vs. orchestration's direct
+    /// SQS). Orchestration has no outbox pattern, so unlike choreography, every hop here keeps an
+    /// active transaction at publish time -- there's no equivalent to the outbox drainer's
+    /// decoupled-from-the-original-transaction gap.
+    /// </summary>
     public static MessageEnvelope Serialize(object message)
     {
         var messageType = message.GetType();
         var payload = JsonSerializer.SerializeToElement(message, messageType);
-        return new MessageEnvelope(Guid.NewGuid().ToString(), messageType.Name, payload);
+
+        var carrier = new Dictionary<string, string>();
+        NewRelic.Api.Agent.NewRelic.GetAgent().CurrentTransaction
+            .InsertDistributedTraceHeaders(carrier, (c, key, value) => c[key] = value);
+
+        return new MessageEnvelope(Guid.NewGuid().ToString(), messageType.Name, payload, carrier.Count > 0 ? carrier : null);
     }
 
+    /// <summary>
+    /// Consumer-side half -- see Serialize's doc comment. AcceptDistributedTraceHeaders is a
+    /// documented no-op when envelope.TraceContext is null/empty or no agent is attached, so this
+    /// is safe to call unconditionally.
+    /// </summary>
     public static object Deserialize(MessageEnvelope envelope)
     {
         var type = TypesByName[envelope.MessageType];
-        return envelope.Payload.Deserialize(type)
+        var message = envelope.Payload.Deserialize(type)
             ?? throw new InvalidOperationException($"Failed to deserialize message of type '{envelope.MessageType}'.");
+
+        if (envelope.TraceContext is { } traceContext)
+        {
+            NewRelic.Api.Agent.NewRelic.GetAgent().CurrentTransaction
+                .AcceptDistributedTraceHeaders(traceContext, (c, key) => c.TryGetValue(key, out var value) ? [value] : [], TransportType.Queue);
+        }
+
+        return message;
     }
 }
