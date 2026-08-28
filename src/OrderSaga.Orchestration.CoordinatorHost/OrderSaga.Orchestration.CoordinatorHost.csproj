@@ -13,4 +13,8 @@
     <ProjectReference Include="..\Saga.Persistence\Saga.Persistence.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="NewRelic.Agent" Version="10.54.0" />
+  </ItemGroup>
+
 </Project>

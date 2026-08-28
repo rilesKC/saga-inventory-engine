@@ -32,4 +32,14 @@ COPY --from=build /app/publish .
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 
+# New Relic .NET agent (NewRelic.Agent NuGet package -- content files land at /app/newrelic in
+# the publish output, confirmed by inspecting a real Linux build; the package ships no compile-
+# time lib, only these runtime content files + a CoreCLR profiler). NEW_RELIC_LICENSE_KEY and
+# NEW_RELIC_APP_NAME come from the container's runtime environment (ECS task definition), not
+# baked in here -- same pattern as Mongo__ConnectionString.
+ENV CORECLR_ENABLE_PROFILING=1
+ENV CORECLR_PROFILER={36032161-FFC0-4B61-B559-F6C5D41BAE5A}
+ENV CORECLR_NEWRELIC_HOME=/app/newrelic
+ENV CORECLR_PROFILER_PATH=/app/newrelic/libNewRelicProfiler.so
+
 ENTRYPOINT ["dotnet", "OrderSaga.Choreography.Host.dll"]

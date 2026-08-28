@@ -36,4 +36,31 @@ public class MessageEnvelopeTests
 
         Assert.Equal(JsonValueKind.Object, envelope.Payload.ValueKind);
     }
+
+    [Fact]
+    public void Serialize_NoActiveNewRelicTransaction_TraceContextIsNull()
+    {
+        // This test process has no New Relic agent attached (no profiler, no [Transaction] scope)
+        // -- InsertDistributedTraceHeaders's setter simply never gets invoked in that case (the
+        // agent API is documented as a safe no-op when the agent isn't installed/active), so the
+        // carrier stays empty. Serialize should collapse that to null rather than shipping an
+        // empty-but-non-null TraceContext on every message.
+        var envelope = OrchestrationMessageTypeRegistry.Serialize(new ReserveStockCommand("ORDER-1", "SKU-1", 4, 199.99m));
+
+        Assert.Null(envelope.TraceContext);
+    }
+
+    [Fact]
+    public void Deserialize_EnvelopeWithFabricatedTraceContext_DoesNotThrow()
+    {
+        // Simulates a message a real, traced producer sent -- AcceptDistributedTraceHeaders must
+        // handle a populated carrier safely even when this consumer process also has no agent
+        // attached (same no-op-when-absent guarantee, just on the accept side).
+        var original = OrchestrationMessageTypeRegistry.Serialize(new ReserveStockCommand("ORDER-1", "SKU-1", 4, 199.99m));
+        var withTraceContext = original with { TraceContext = new Dictionary<string, string> { ["traceparent"] = "00-abc-def-01" } };
+
+        var exception = Record.Exception(() => OrchestrationMessageTypeRegistry.Deserialize(withTraceContext));
+
+        Assert.Null(exception);
+    }
 }

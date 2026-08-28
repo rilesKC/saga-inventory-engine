@@ -44,3 +44,10 @@ variable "atlas_org_id" {
   description = "MongoDB Atlas organization ID -- see MONGODB_ATLAS_ORG_ID in the repo's gitignored .env."
   type        = string
 }
+
+variable "new_relic_license_key" {
+  description = "New Relic license key for APM. Defaults to empty -- the .NET agent's profiler still loads (CORECLR_ENABLE_PROFILING is unconditional in each Dockerfile) but simply fails to report anywhere useful without a real key, so this is safe to leave unset until a New Relic account exists."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

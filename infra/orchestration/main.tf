@@ -107,12 +107,16 @@ locals {
         { name = "Mongo__DatabaseName", value = "orchestration" },
         { name = "Mongo__SagaStateCollectionName", value = "saga-state" },
         { name = "S3__ArchiveBucketName", value = module.persistence.archive_bucket_name },
+        # New Relic's own literal env var name, not a .NET config key -- no double-underscore.
+        { name = "NEW_RELIC_APP_NAME", value = "${var.name}-coordinator" },
       ]
       secret_environment_variables = [
         { name = "Mongo__ConnectionString", valueFrom = module.persistence.connection_string_secret_arn },
+        { name = "NEW_RELIC_LICENSE_KEY", valueFrom = aws_secretsmanager_secret.new_relic_license_key.arn },
       ]
       task_execution_policy_statements = [
         { actions = ["secretsmanager:GetSecretValue"], resources = [module.persistence.connection_string_secret_arn] },
+        { actions = ["secretsmanager:GetSecretValue"], resources = [aws_secretsmanager_secret.new_relic_license_key.arn] },
       ]
     }
     inventory = {
@@ -147,12 +151,16 @@ locals {
         { name = "Mongo__DatabaseName", value = "orchestration" },
         { name = "Mongo__InventoryEventsCollectionName", value = "inventory-events" },
         { name = "S3__ArchiveBucketName", value = module.persistence.archive_bucket_name },
+        # New Relic's own literal env var name, not a .NET config key -- no double-underscore.
+        { name = "NEW_RELIC_APP_NAME", value = "${var.name}-inventory" },
       ]
       secret_environment_variables = [
         { name = "Mongo__ConnectionString", valueFrom = module.persistence.connection_string_secret_arn },
+        { name = "NEW_RELIC_LICENSE_KEY", valueFrom = aws_secretsmanager_secret.new_relic_license_key.arn },
       ]
       task_execution_policy_statements = [
         { actions = ["secretsmanager:GetSecretValue"], resources = [module.persistence.connection_string_secret_arn] },
+        { actions = ["secretsmanager:GetSecretValue"], resources = [aws_secretsmanager_secret.new_relic_license_key.arn] },
       ]
     }
     responder = {
@@ -180,11 +188,17 @@ locals {
         { name = "Sqs__CoordinatorInboundQueueUrl", value = module.orchestration_messaging.coordinator_inbound_queue_url },
         { name = "Sqs__StatelessResponderCommandsQueueUrl", value = module.orchestration_messaging.stateless_responder_commands_queue_url },
         { name = "Dynamo__IdempotencyTableName", value = module.idempotency.table_name },
+        # New Relic's own literal env var name, not a .NET config key -- no double-underscore.
+        { name = "NEW_RELIC_APP_NAME", value = "${var.name}-responder" },
       ]
-      # Neither PaymentResponder nor ShippingResponder touches Mongo -- kept empty (not omitted) so
-      # every entry in this map has the same shape, which for_each below requires.
-      secret_environment_variables     = []
-      task_execution_policy_statements = []
+      # Neither PaymentResponder nor ShippingResponder touches Mongo, so New Relic is the only
+      # secret this service needs -- no longer fully empty the way it was before New Relic existed.
+      secret_environment_variables = [
+        { name = "NEW_RELIC_LICENSE_KEY", valueFrom = aws_secretsmanager_secret.new_relic_license_key.arn },
+      ]
+      task_execution_policy_statements = [
+        { actions = ["secretsmanager:GetSecretValue"], resources = [aws_secretsmanager_secret.new_relic_license_key.arn] },
+      ]
     }
   }
 }

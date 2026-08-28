@@ -34,4 +34,11 @@ COPY --from=build /app/publish .
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 
+# New Relic .NET agent -- see OrderSaga.Choreography.Host/Dockerfile for why these specific paths
+# (confirmed by inspecting a real Linux build's publish output).
+ENV CORECLR_ENABLE_PROFILING=1
+ENV CORECLR_PROFILER={36032161-FFC0-4B61-B559-F6C5D41BAE5A}
+ENV CORECLR_NEWRELIC_HOME=/app/newrelic
+ENV CORECLR_PROFILER_PATH=/app/newrelic/libNewRelicProfiler.so
+
 ENTRYPOINT ["dotnet", "OrderSaga.Orchestration.CoordinatorHost.dll"]
