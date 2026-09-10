@@ -3,6 +3,7 @@ import express from "express";
 import { createOrdersRouter } from "./routes/orders.js";
 
 const app = express();
+app.disable("x-powered-by");
 // Local-only, learning project -- the web app runs on a different origin (Vite dev server) than
 // this BFF, so the browser needs CORS headers to allow the cross-origin fetch. No auth/production
 // concerns here (see docs/specs/bff-web-client.md's Out of Scope), so a permissive default origin

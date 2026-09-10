@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 /** Mounts a router on a fresh Express app and listens on an ephemeral port -- real HTTP, no mocking library. */
 export async function startTestServer(router: Router) {
   const app = express();
+  app.disable("x-powered-by");
   app.use(express.json());
   app.use(router);
 

@@ -13,7 +13,10 @@ afterEach(() => {
 });
 
 describe("POST /orders", () => {
-  it("routes to choreography host when stack=choreography", async () => {
+  it.each([
+    ["choreography", () => config.choreographyHostUrl],
+    ["orchestration", () => config.orchestrationHostUrl],
+  ] as const)("routes to %s host when stack=%s", async (stack, hostUrl) => {
     const calls: string[] = [];
     const fetchStub: typeof fetch = async (url) => {
       calls.push(url.toString());
@@ -25,30 +28,11 @@ describe("POST /orders", () => {
     const res = await fetch(`${baseUrl}/orders`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stack: "choreography", ...orderPayload }),
+      body: JSON.stringify({ stack, ...orderPayload }),
     });
 
     expect(res.status).toBe(202);
-    expect(calls).toEqual([`${config.choreographyHostUrl}/orders`]);
-  });
-
-  it("routes to orchestration host when stack=orchestration", async () => {
-    const calls: string[] = [];
-    const fetchStub: typeof fetch = async (url) => {
-      calls.push(url.toString());
-      return new Response(null, { status: 202 });
-    };
-    const { server, baseUrl } = await startTestServer(createOrdersRouter(fetchStub));
-    activeServer = server;
-
-    const res = await fetch(`${baseUrl}/orders`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ stack: "orchestration", ...orderPayload }),
-    });
-
-    expect(res.status).toBe(202);
-    expect(calls).toEqual([`${config.orchestrationHostUrl}/orders`]);
+    expect(calls).toEqual([`${hostUrl()}/orders`]);
   });
 
   it("returns 400 for an invalid stack value", async () => {

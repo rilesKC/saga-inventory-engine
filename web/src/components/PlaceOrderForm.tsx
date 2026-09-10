@@ -3,7 +3,7 @@ import { BFF_URL, type Stack } from "../api";
 
 type PlaceOrderFormProps = {
   /** Defaults to the global fetch; injectable so tests can stub the BFF call without a mocking library. */
-  fetchFn?: typeof fetch;
+  readonly fetchFn?: typeof fetch;
 };
 
 export function PlaceOrderForm({ fetchFn = fetch }: PlaceOrderFormProps) {
@@ -31,29 +31,19 @@ export function PlaceOrderForm({ fetchFn = fetch }: PlaceOrderFormProps) {
   return (
     <form onSubmit={handleSubmit}>
       <h2>Place Order</h2>
-      <label>
-        Order ID
-        <input value={orderId} onChange={(e) => setOrderId(e.target.value)} />
-      </label>
-      <label>
-        SKU
-        <input value={sku} onChange={(e) => setSku(e.target.value)} />
-      </label>
-      <label>
-        Quantity
-        <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
-      </label>
-      <label>
-        Amount
-        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
-      </label>
-      <label>
-        Stack
-        <select value={stack} onChange={(e) => setStack(e.target.value as Stack)}>
-          <option value="choreography">Choreography</option>
-          <option value="orchestration">Orchestration</option>
-        </select>
-      </label>
+      <label htmlFor="place-order-id">Order ID</label>
+      <input id="place-order-id" value={orderId} onChange={(e) => setOrderId(e.target.value)} />
+      <label htmlFor="place-sku">SKU</label>
+      <input id="place-sku" value={sku} onChange={(e) => setSku(e.target.value)} />
+      <label htmlFor="place-quantity">Quantity</label>
+      <input id="place-quantity" type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+      <label htmlFor="place-amount">Amount</label>
+      <input id="place-amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+      <label htmlFor="place-stack">Stack</label>
+      <select id="place-stack" value={stack} onChange={(e) => setStack(e.target.value as Stack)}>
+        <option value="choreography">Choreography</option>
+        <option value="orchestration">Orchestration</option>
+      </select>
       <button type="submit">Place Order</button>
     </form>
   );

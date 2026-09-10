@@ -13,7 +13,7 @@ type OrderDetails = {
 
 type OrderLookupProps = {
   /** Defaults to the global fetch; injectable so tests can stub the BFF call without a mocking library. */
-  fetchFn?: typeof fetch;
+  readonly fetchFn?: typeof fetch;
 };
 
 export function OrderLookup({ fetchFn = fetch }: OrderLookupProps) {
@@ -27,7 +27,9 @@ export function OrderLookup({ fetchFn = fetch }: OrderLookupProps) {
     setNotFound(false);
     setResult(null);
 
-    const response = await fetchFn(`${BFF_URL}/orders/${orderId}?stack=${stack}`);
+    // orderId is user input; encode it so it can't reshape the request path/query rather than
+    // being treated as a plain path segment value.
+    const response = await fetchFn(`${BFF_URL}/orders/${encodeURIComponent(orderId)}?stack=${encodeURIComponent(stack)}`);
 
     if (response.status === 404) {
       setNotFound(true);
@@ -42,17 +44,13 @@ export function OrderLookup({ fetchFn = fetch }: OrderLookupProps) {
     <div>
       <form onSubmit={handleSubmit}>
         <h2>Look Up Order</h2>
-        <label>
-          Order ID
-          <input value={orderId} onChange={(e) => setOrderId(e.target.value)} />
-        </label>
-        <label>
-          Stack
-          <select value={stack} onChange={(e) => setStack(e.target.value as Stack)}>
-            <option value="choreography">Choreography</option>
-            <option value="orchestration">Orchestration</option>
-          </select>
-        </label>
+        <label htmlFor="lookup-order-id">Order ID</label>
+        <input id="lookup-order-id" value={orderId} onChange={(e) => setOrderId(e.target.value)} />
+        <label htmlFor="lookup-stack">Stack</label>
+        <select id="lookup-stack" value={stack} onChange={(e) => setStack(e.target.value as Stack)}>
+          <option value="choreography">Choreography</option>
+          <option value="orchestration">Orchestration</option>
+        </select>
         <button type="submit">Look Up</button>
       </form>
       {notFound && <p>Order not found.</p>}
@@ -61,7 +59,7 @@ export function OrderLookup({ fetchFn = fetch }: OrderLookupProps) {
           <p>Status: {result.status}</p>
           <ul>
             {result.history.map((event, i) => (
-              <li key={i}>{event.eventType ?? JSON.stringify(event)}</li>
+              <li key={`${i}-${event.eventType ?? "event"}`}>{event.eventType ?? JSON.stringify(event)}</li>
             ))}
           </ul>
         </div>
