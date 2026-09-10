@@ -121,11 +121,11 @@ Spec: docs/specs/bff-web-client.md
 
 ### BFF (Node/TypeScript, local-only)
 
-- [ ] 9. Scaffold the BFF project (npm, TypeScript, Express) with a health check
+- [x] 9. Scaffold the BFF project (npm, TypeScript, Express) with a health check
       - File(s): bff/package.json, bff/tsconfig.json, bff/src/index.ts (new)
       - Verification: `npm run dev` starts the server; `GET /health` returns 200
 
-- [ ] 10. `POST /orders` — takes `{ stack: "choreography" | "orchestration", ...order fields }`,
+- [x] 10. `POST /orders` — takes `{ stack: "choreography" | "orchestration", ...order fields }`,
       proxies to the corresponding host's `POST /orders`, returns its status/body; 400 for an
       invalid `stack` value
       - File(s): bff/src/config.ts (new — host base URLs from env vars), bff/src/routes/orders.ts (new)
@@ -133,7 +133,7 @@ Spec: docs/specs/bff-web-client.md
         `stack: "choreography"`, routes to orchestration when `stack: "orchestration"`, returns 400
         for an invalid `stack` value (stub the downstream `fetch` call manually, no mocking library)
 
-- [ ] 11. `GET /orders/:id?stack=...` — proxies to the chosen host's new `GET /orders/{id}`,
+- [x] 11. `GET /orders/:id?stack=...` — proxies to the chosen host's new `GET /orders/{id}`,
       passes through 404, normalizes both hosts' responses into one shared shape
       - File(s): bff/src/routes/orders.ts (extend)
       - Test: bff/tests/orders.route.test.ts — proxies to the requested stack and passes through a
