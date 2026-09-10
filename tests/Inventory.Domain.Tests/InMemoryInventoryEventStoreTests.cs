@@ -100,6 +100,33 @@ public class InMemoryInventoryEventStoreTests
     }
 
     [Fact]
+    public async Task LoadEventsForOrderAsync_NoMatchingEvents_ReturnsEmpty()
+    {
+        var store = new InMemoryInventoryEventStore();
+        await store.AppendRangeAsync("SKU-1", 0, [new StockReserved("SKU-1", "ORDER-1", 4, 199.99m)], CancellationToken.None);
+
+        var events = await store.LoadEventsForOrderAsync("ORDER-UNKNOWN", CancellationToken.None);
+
+        Assert.Empty(events);
+    }
+
+    [Fact]
+    public async Task LoadEventsForOrderAsync_MatchingEvents_ReturnsOnlyThatOrdersEventsAcrossSkus()
+    {
+        var store = new InMemoryInventoryEventStore();
+        var stockSeededSku1 = new StockSeeded("SKU-1", 100);
+        var reservedOrder1 = new StockReserved("SKU-1", "ORDER-1", 4, 199.99m);
+        var confirmedOrder1 = new ReservationConfirmed("SKU-1", "ORDER-1", 4);
+        var reservedOrder2OnDifferentSku = new StockReserved("SKU-2", "ORDER-2", 1, 9.99m);
+        await store.AppendRangeAsync("SKU-1", 0, [stockSeededSku1, reservedOrder1, confirmedOrder1], CancellationToken.None);
+        await store.AppendRangeAsync("SKU-2", 0, [reservedOrder2OnDifferentSku], CancellationToken.None);
+
+        var events = await store.LoadEventsForOrderAsync("ORDER-1", CancellationToken.None);
+
+        Assert.Equal([reservedOrder1, confirmedOrder1], events);
+    }
+
+    [Fact]
     public async Task LoadUnpublishedAsync_StockSeededAppendedViaSeedPath_StillShowsAsUnpublished()
     {
         // The store itself doesn't know about IOutboundEvent -- filtering out event types that

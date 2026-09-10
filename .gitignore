@@ -4,6 +4,12 @@ obj/
 *.user
 .vs/
 
+# Node / TypeScript (bff/, web/)
+node_modules/
+dist/
+bff/.env
+web/.env
+
 # Terraform
 .terraform/
 # .terraform.lock.hcl is intentionally NOT ignored -- it locks provider versions for reproducible

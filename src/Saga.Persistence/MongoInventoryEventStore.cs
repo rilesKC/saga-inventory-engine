@@ -34,6 +34,11 @@ public sealed class MongoInventoryEventStore : IInventoryEventStore
 
         var indexKeys = Builders<BsonDocument>.IndexKeys.Ascending("Sku").Ascending("Sequence");
         _collection.Indexes.CreateOne(new CreateIndexModel<BsonDocument>(indexKeys, new CreateIndexOptions { Unique = true }));
+
+        // Backs LoadEventsForOrderAsync's cross-SKU lookup. Not unique -- an order's Reserved/
+        // Confirmed/Released events all share the same OrderId.
+        var orderIdIndexKeys = Builders<BsonDocument>.IndexKeys.Ascending("Payload.OrderId");
+        _collection.Indexes.CreateOne(new CreateIndexModel<BsonDocument>(orderIdIndexKeys));
     }
 
     public async Task AppendRangeAsync(string sku, int expectedEventCount, IReadOnlyList<object> events, CancellationToken cancellationToken)
@@ -68,6 +73,22 @@ public sealed class MongoInventoryEventStore : IInventoryEventStore
     {
         var filter = Builders<BsonDocument>.Filter.Eq("Sku", sku);
         var sort = Builders<BsonDocument>.Sort.Ascending("Sequence");
+
+        var documents = await _collection.Find(filter).Sort(sort).ToListAsync(cancellationToken);
+
+        return documents
+            .Select(document =>
+            {
+                var eventType = TypesByName[document["EventType"].AsString];
+                return BsonSerializer.Deserialize(document["Payload"].AsBsonDocument, eventType);
+            })
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<object>> LoadEventsForOrderAsync(string orderId, CancellationToken cancellationToken)
+    {
+        var filter = Builders<BsonDocument>.Filter.Eq("Payload.OrderId", orderId);
+        var sort = Builders<BsonDocument>.Sort.Ascending("Sku").Ascending("Sequence");
 
         var documents = await _collection.Find(filter).Sort(sort).ToListAsync(cancellationToken);
 

@@ -18,6 +18,9 @@ public class S3ArchivingInventoryEventStoreTests
         public Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<object>>([]);
 
+        public Task<IReadOnlyList<object>> LoadEventsForOrderAsync(string orderId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<object>>([]);
+
         public Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<PendingOutboxEntry>>([]);
 
@@ -31,6 +34,9 @@ public class S3ArchivingInventoryEventStoreTests
             throw new InvalidOperationException("simulated Mongo failure");
 
         public Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("simulated Mongo failure");
+
+        public Task<IReadOnlyList<object>> LoadEventsForOrderAsync(string orderId, CancellationToken cancellationToken) =>
             throw new InvalidOperationException("simulated Mongo failure");
 
         public Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken) =>
@@ -118,6 +124,9 @@ public class S3ArchivingInventoryEventStoreTests
             throw new ConcurrencyConflictException(sku, expectedEventCount, expectedEventCount + 1);
 
         public Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<object>>([]);
+
+        public Task<IReadOnlyList<object>> LoadEventsForOrderAsync(string orderId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<object>>([]);
 
         public Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken) =>

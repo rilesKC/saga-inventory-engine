@@ -111,6 +111,7 @@ var outboundBus = new EventBus();
 builder.Services.AddSingleton(sp => new OutboundEventForwarder(outboundBus, sp.GetRequiredService<IEventPublisher>()));
 builder.Services.AddSingleton(sp => new SqsMessageProcessor(inboundBus, sp.GetRequiredService<IIdempotencyStore>()));
 builder.Services.AddSingleton<OrderIntakeHandler>();
+builder.Services.AddSingleton<OrderLookupHandler>();
 
 var queueUrl = builder.Configuration["Sqs:QueueUrl"]
     ?? throw new InvalidOperationException("Configuration value 'Sqs:QueueUrl' is required.");
@@ -164,5 +165,11 @@ app.MapGet("/health", () => Results.Ok());
 
 app.MapPost("/orders", (PlaceOrderRequest request, OrderIntakeHandler handler) =>
     handler.Handle(request) ? Results.Accepted() : Results.BadRequest());
+
+app.MapGet("/orders/{id}", async (string id, OrderLookupHandler handler, CancellationToken cancellationToken) =>
+{
+    var details = await handler.HandleAsync(id, cancellationToken);
+    return details is null ? Results.NotFound() : Results.Ok(details);
+});
 
 app.Run();
