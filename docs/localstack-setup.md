@@ -44,7 +44,10 @@ Note the `queue_url` and `event_bus_name` outputs — you'll need both for the H
 
 ## Running the Host app against it
 
-Not containerized, not through ECS — just `dotnet run` locally, pointed at LocalStack:
+Not containerized, not through ECS — just `dotnet run` locally, pointed at LocalStack. The Host
+also unconditionally requires Mongo/S3 config at startup (it throws before ever binding a port if
+these are missing) — see "Running against a real Mongo Atlas cluster too" below for where these
+values come from; there's no way to start the Host without them, even for LocalStack-only checks:
 
 ```bash
 cd src/OrderSaga.Choreography.Host
@@ -52,6 +55,10 @@ AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_REGION=us-east-1 \
   Aws__ServiceUrl=http://localhost:4566 \
   Sqs__QueueUrl="<queue_url output from above>" \
   EventBridge__BusName="<event_bus_name output from above, "order-saga-choreography" by default>" \
+  Mongo__ConnectionString="<connection string, see below>" \
+  Mongo__DatabaseName="inventory" \
+  Mongo__InventoryEventsCollectionName="inventory-events" \
+  S3__ArchiveBucketName="order-saga-choreography-event-archive" \
   dotnet run
 ```
 
@@ -61,6 +68,17 @@ Then exercise the saga:
 curl -X POST http://localhost:5000/orders -H "Content-Type: application/json" \
   -d '{"orderId":"ORDER-1","sku":"SKU-1","quantity":4,"amount":199.99}'
 ```
+
+And look up what it did (added alongside the BFF/web client — see
+`docs/specs/bff-web-client.md`):
+
+```bash
+curl http://localhost:5000/orders/ORDER-1
+```
+
+A healthy run returns `status: "Reserved"` (or `"Confirmed"` once payment/confirmation have also
+processed) and a `history` array of the events that got there
+(`StockReserved`/`ReservationConfirmed`/`ReservationReleased`).
 
 ## Verifying it actually worked
 
@@ -87,10 +105,7 @@ A healthy happy-path run produces exactly 5 claims (`OrderPlaced`, `StockReserve
 
 ## S3 event archive (standalone, not through the full Host)
 
-MongoDB Atlas isn't an AWS service, so LocalStack can't emulate the live Mongo store the full Host
-needs — only the S3 archive side of persistence is worth validating here (see
-`docs/specs/saga-persistence.md`); the Mongo-backed path is only exercisable against the real Atlas
-cluster (see the Saga Persistence plan's real-deployment task). Apply just the bucket:
+Apply just the bucket:
 
 ```bash
 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test terraform apply -auto-approve \
@@ -102,6 +117,64 @@ AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test terraform apply -auto-approve 
 Then exercise `S3EventArchiveWriter` directly (a small standalone `dotnet run`, not the full Host)
 against `order-saga-choreography-event-archive`, and confirm the object landed via a plain `curl`
 against the bucket — no AWS CLI needed, same precedent as the SQS/DynamoDB checks above.
+
+## Running against a real Mongo Atlas cluster too
+
+MongoDB Atlas isn't an AWS service, so LocalStack can't emulate the live Mongo store the full Host
+needs — and the Host requires it unconditionally at startup (see above), so there's no way to run
+it against LocalStack alone. This is genuinely exercisable locally, though — confirmed working
+2026-09-10 — it just needs a temporary real (free-tier) Atlas cluster alongside LocalStack:
+
+1. **Get your machine's public IP** (`curl -s https://api.ipify.org`) — the cluster's network
+   access list needs it, since nothing is deployed to provide the NAT gateway IP the module
+   normally uses.
+2. **Temporarily edit `infra/main.tf`'s `module "persistence"` block** — replace
+   `nat_gateway_ip = module.networking.nat_gateway_ip` with your IP as a literal string. Revert
+   this before committing anything; never check in a personal IP.
+3. **Apply just the Atlas resources**, real credentials, no LocalStack/AWS involved for these:
+   ```bash
+   terraform apply -auto-approve \
+     -target=module.persistence.mongodbatlas_project.this \
+     -target=module.persistence.mongodbatlas_project_ip_access_list.nat_gateway \
+     -target=module.persistence.mongodbatlas_cluster.this \
+     -target=module.persistence.random_password.database_user \
+     -target=module.persistence.mongodbatlas_database_user.this \
+     -var="atlas_org_id=$MONGODB_ATLAS_ORG_ID"
+   ```
+   (Requires `MONGODB_ATLAS_PUBLIC_KEY`/`MONGODB_ATLAS_PRIVATE_KEY`/`MONGODB_ATLAS_ORG_ID` in the
+   repo-root `.env` — the provider reads the first two automatically.)
+4. **There's no root output for the connection string** (the module only exposes a Secrets
+   Manager ARN, which LocalStack's free tier doesn't emulate) — pull it straight from state
+   instead, which isn't redacted the way `terraform state show`'s human output is:
+   ```bash
+   $state = terraform state pull | ConvertFrom-Json
+   $pw = ($state.resources | Where-Object { $_.type -eq "random_password" -and $_.name -eq "database_user" }).instances[0].attributes.result
+   $srv = ($state.resources | Where-Object { $_.type -eq "mongodbatlas_cluster" }).instances[0].attributes.connection_strings[0].standard_srv
+   # Connection string: replace "mongodb+srv://" with "mongodb+srv://app:$pw@"
+   ```
+5. Use that connection string as `Mongo__ConnectionString` above (`Mongo__DatabaseName=inventory`,
+   matching `infra/main.tf`'s `module "persistence"` block).
+
+**Cleanup — don't skip this, it's a real (if free) cluster in your Atlas org:**
+
+```bash
+terraform destroy -auto-approve \
+  -target=module.persistence.mongodbatlas_database_user.this \
+  -target=module.persistence.mongodbatlas_cluster.this \
+  -target=module.persistence.mongodbatlas_project_ip_access_list.nat_gateway \
+  -target=module.persistence.mongodbatlas_project.this \
+  -target=module.persistence.random_password.database_user \
+  -var="atlas_org_id=$MONGODB_ATLAS_ORG_ID"
+```
+
+Then revert step 2's edit (`git checkout -- infra/main.tf`) and follow the "Cleaning up" section
+below as usual. **Destroy the Atlas resources *before* tearing down LocalStack, not after** — the
+LocalStack-backed resources (SQS/DynamoDB/S3) in the same apply need a live LocalStack endpoint to
+refresh against; tearing LocalStack down first makes a combined `terraform destroy` hang retrying
+a dead endpoint instead of erroring cleanly. If that happens: kill the hung `terraform` process,
+remove the stale `.terraform.tfstate.lock.info`, `terraform state rm` the LocalStack-backed
+resources (they don't exist anywhere anymore, so there's nothing to reconcile), then destroy just
+the Atlas resources on their own.
 
 ## Cleaning up
 
