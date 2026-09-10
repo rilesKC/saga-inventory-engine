@@ -219,6 +219,9 @@ public class InventoryParticipantTests
         public Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken) =>
             inner.LoadEventsAsync(sku, cancellationToken);
 
+        public Task<IReadOnlyList<object>> LoadEventsForOrderAsync(string orderId, CancellationToken cancellationToken) =>
+            inner.LoadEventsForOrderAsync(orderId, cancellationToken);
+
         public Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken) =>
             inner.LoadUnpublishedAsync(cancellationToken);
 
@@ -242,6 +245,9 @@ public class InventoryParticipantTests
 
         public Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken) =>
             inner.LoadEventsAsync(sku, cancellationToken);
+
+        public Task<IReadOnlyList<object>> LoadEventsForOrderAsync(string orderId, CancellationToken cancellationToken) =>
+            inner.LoadEventsForOrderAsync(orderId, cancellationToken);
 
         public Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken) =>
             inner.LoadUnpublishedAsync(cancellationToken);

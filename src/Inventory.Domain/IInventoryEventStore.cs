@@ -14,6 +14,15 @@ public interface IInventoryEventStore
     Task<IReadOnlyList<object>> LoadEventsAsync(string sku, CancellationToken cancellationToken);
 
     /// <summary>
+    /// All events across every SKU that carry this OrderId -- <see cref="StockReserved"/>,
+    /// <see cref="ReservationConfirmed"/>, and <see cref="ReservationReleased"/> each do;
+    /// <see cref="StockSeeded"/> never does, since it's a per-SKU infra event with no order
+    /// association, so it's never returned here. There's no OrderId index -- this is a full scan,
+    /// acceptable at this project's scale.
+    /// </summary>
+    Task<IReadOnlyList<object>> LoadEventsForOrderAsync(string orderId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Every event not yet marked published via <see cref="MarkPublishedAsync"/>, across all SKUs
     /// -- the outbox drainer's read side. Includes events whose type doesn't implement
     /// <see cref="IOutboundEvent"/> (e.g. StockSeeded): the store tracks "has this been marked

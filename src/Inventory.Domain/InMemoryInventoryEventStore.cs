@@ -46,6 +46,29 @@ public sealed class InMemoryInventoryEventStore : IInventoryEventStore
         }
     }
 
+    public Task<IReadOnlyList<object>> LoadEventsForOrderAsync(string orderId, CancellationToken cancellationToken)
+    {
+        var matches = new List<object>();
+
+        foreach (var list in _eventsBySku.Values)
+        {
+            lock (list)
+            {
+                matches.AddRange(list.Select(e => e.Event).Where(e => GetOrderId(e) == orderId));
+            }
+        }
+
+        return Task.FromResult<IReadOnlyList<object>>(matches);
+    }
+
+    private static string? GetOrderId(object @event) => @event switch
+    {
+        StockReserved e => e.OrderId,
+        ReservationConfirmed e => e.OrderId,
+        ReservationReleased e => e.OrderId,
+        _ => null,
+    };
+
     public Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken)
     {
         var pending = new List<PendingOutboxEntry>();

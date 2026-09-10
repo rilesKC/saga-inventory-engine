@@ -80,6 +80,25 @@ public sealed class MongoInventoryEventStore : IInventoryEventStore
             .ToList();
     }
 
+    public async Task<IReadOnlyList<object>> LoadEventsForOrderAsync(string orderId, CancellationToken cancellationToken)
+    {
+        // No OrderId index exists -- this filters the embedded Payload.OrderId field across the
+        // whole collection, not scoped to a single Sku's {Sku, Sequence} index. Acceptable at this
+        // project's scale (see IInventoryEventStore.LoadEventsForOrderAsync's doc comment).
+        var filter = Builders<BsonDocument>.Filter.Eq("Payload.OrderId", orderId);
+        var sort = Builders<BsonDocument>.Sort.Ascending("Sku").Ascending("Sequence");
+
+        var documents = await _collection.Find(filter).Sort(sort).ToListAsync(cancellationToken);
+
+        return documents
+            .Select(document =>
+            {
+                var eventType = TypesByName[document["EventType"].AsString];
+                return BsonSerializer.Deserialize(document["Payload"].AsBsonDocument, eventType);
+            })
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken)
     {
         // Ne("Published", true) rather than Eq("Published", false): safely matches documents
