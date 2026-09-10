@@ -48,6 +48,18 @@ crash-recovery mid-saga, not just the single-instance happy path — then torn d
 [docs/plans/saga-persistence-plan.md](docs/plans/saga-persistence-plan.md) for the design and what
 that real deployment found.
 
+A local-only Node/TypeScript BFF (`bff/`) and React frontend (`web/`) round out the project —
+closing the last named gap in the target job's technology stack (the AWS-native backend above
+already covered the rest). Both saga stacks expose `GET /orders/{id}` for this; Choreography
+synthesizes status from Inventory event history (it has no central saga state), Orchestration
+derives it the same way so both stacks report status in one shared vocabulary, with `SagaStep`
+exposed separately as orchestration-only detail. See
+[docs/specs/bff-web-client.md](docs/specs/bff-web-client.md) /
+[docs/plans/bff-web-client-plan.md](docs/plans/bff-web-client-plan.md) for the design, and
+[docs/localstack-setup.md](docs/localstack-setup.md) /
+[docs/localstack-setup-orchestration.md](docs/localstack-setup-orchestration.md) for how to run
+the whole thing locally, real Mongo included.
+
 ## Development process
 
 This project uses a spec-first pipeline: `/brainstorm` → `/plan` → test-first implementation →
