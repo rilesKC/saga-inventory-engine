@@ -16,20 +16,30 @@ type OrderLookupProps = {
   readonly fetchFn?: typeof fetch;
 };
 
+// Order IDs are always assigned by PlaceOrderForm's own submission flow (see that component),
+// so this is also a real constraint, not just an escape hatch -- an id outside this shape can't
+// be one this app ever created.
+const ORDER_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
 export function OrderLookup({ fetchFn = fetch }: OrderLookupProps) {
   const [orderId, setOrderId] = useState("");
   const [stack, setStack] = useState<Stack>("choreography");
   const [result, setResult] = useState<OrderDetails | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [invalid, setInvalid] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setNotFound(false);
     setResult(null);
+    setInvalid(false);
 
-    // orderId is user input; encode it so it can't reshape the request path/query rather than
-    // being treated as a plain path segment value.
-    const response = await fetchFn(`${BFF_URL}/orders/${encodeURIComponent(orderId)}?stack=${encodeURIComponent(stack)}`);
+    if (!ORDER_ID_PATTERN.test(orderId)) {
+      setInvalid(true);
+      return;
+    }
+
+    const response = await fetchFn(`${BFF_URL}/orders/${orderId}?stack=${stack}`);
 
     if (response.status === 404) {
       setNotFound(true);
@@ -53,6 +63,7 @@ export function OrderLookup({ fetchFn = fetch }: OrderLookupProps) {
         </select>
         <button type="submit">Look Up</button>
       </form>
+      {invalid && <p>Order ID must be 1-64 letters, digits, underscores, or hyphens.</p>}
       {notFound && <p>Order not found.</p>}
       {result && (
         <div>
