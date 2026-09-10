@@ -34,7 +34,7 @@ export function OrderLookup({ fetchFn = fetch }: OrderLookupProps) {
     setResult(null);
     setInvalid(false);
 
-    if (!ORDER_ID_PATTERN.test(orderId)) {
+    if (!ORDER_ID_PATTERN.test(orderId) || (stack !== "choreography" && stack !== "orchestration")) {
       setInvalid(true);
       return;
     }
