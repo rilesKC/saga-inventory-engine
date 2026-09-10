@@ -101,7 +101,7 @@ Spec: docs/specs/bff-web-client.md
 
 ### Orchestration CoordinatorHost — GET /orders/{id}
 
-- [ ] 7. Add `OrderLookupHandler` (calls `ISagaStateStore.TryLoadAsync(orderId)`; returns null if
+- [x] 7. Add `OrderLookupHandler` (calls `ISagaStateStore.TryLoadAsync(orderId)`; returns null if
       not found; otherwise calls the existing `IInventoryEventStore.LoadEventsAsync(state.Sku)`,
       filters to that OrderId, maps `SagaState.Step` to a status string) + `OrderDetails` record
       - File(s): src/OrderSaga.Orchestration.CoordinatorHost/OrderLookupHandler.cs (new), src/OrderSaga.Orchestration.CoordinatorHost/OrderDetails.cs (new)
@@ -109,7 +109,7 @@ Spec: docs/specs/bff-web-client.md
         `Handle_UnknownOrderId_ReturnsNull` (using `InMemorySagaStateStore` + `InMemoryInventoryEventStore`),
         `Handle_KnownOrderId_ReturnsDetailsWithHistoryAndStatus`
 
-- [ ] 8. Promote `sagaStateStore` from a local variable to a registered DI singleton; construct and
+- [x] 8. Promote `sagaStateStore` from a local variable to a registered DI singleton; construct and
       register `IInventoryEventStore` the same way (reusing the already-resolved Mongo config);
       wire `GET /orders/{id}` into `Program.cs`
       - File(s): src/OrderSaga.Orchestration.CoordinatorHost/Program.cs

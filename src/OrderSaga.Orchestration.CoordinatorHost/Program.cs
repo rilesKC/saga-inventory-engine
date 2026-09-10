@@ -1,6 +1,7 @@
 using Amazon.DynamoDBv2;
 using Amazon.S3;
 using Amazon.SQS;
+using Inventory.Domain;
 using MongoDB.Driver;
 using OrderSaga.Aws;
 using OrderSaga.Orchestration;
@@ -63,8 +64,6 @@ builder.Services.AddSingleton(sp => new OutboundMessageForwarder(outboundBus, sp
 
 builder.Services.AddSingleton(sp => new OrderIntakeHandler(sp.GetRequiredKeyedService<IMessagePublisher>("coordinator-inbound")));
 
-var app = builder.Build();
-
 // Mongo is the live SagaState snapshot store; S3 is a best-effort secondary archive -- see
 // docs/specs/saga-persistence.md. Same Mongo cluster/database as the Inventory responder's
 // InventoryHost, a different collection (SagaState isn't event-sourced, so it doesn't share
@@ -76,14 +75,35 @@ var mongoDatabaseName = builder.Configuration["Mongo:DatabaseName"]
     ?? throw new InvalidOperationException("Configuration value 'Mongo:DatabaseName' is required.");
 var sagaStateCollectionName = builder.Configuration["Mongo:SagaStateCollectionName"]
     ?? throw new InvalidOperationException("Configuration value 'Mongo:SagaStateCollectionName' is required.");
+// Not otherwise needed by this host's saga-coordination flow -- read only so OrderLookupHandler
+// can filter Inventory history down to one order, same Mongo cluster InventoryHost already writes.
+var inventoryEventsCollectionName = builder.Configuration["Mongo:InventoryEventsCollectionName"]
+    ?? throw new InvalidOperationException("Configuration value 'Mongo:InventoryEventsCollectionName' is required.");
 var archiveBucketName = builder.Configuration["S3:ArchiveBucketName"]
     ?? throw new InvalidOperationException("Configuration value 'S3:ArchiveBucketName' is required.");
 
-var mongoDatabase = new MongoClient(mongoConnectionString).GetDatabase(mongoDatabaseName);
-var sagaStateStore = new S3ArchivingSagaStateStore(
-    new MongoSagaStateStore(mongoDatabase, sagaStateCollectionName),
-    new S3EventArchiveWriter(app.Services.GetRequiredService<IAmazonS3>(), archiveBucketName),
-    app.Services.GetRequiredService<ILogger<S3ArchivingSagaStateStore>>());
+// Shared by both stores below so they use one MongoClient (one connection pool) against the
+// cluster, not one each.
+builder.Services.AddSingleton(_ => new MongoClient(mongoConnectionString).GetDatabase(mongoDatabaseName));
+
+// Promoted from a local variable to a registered singleton (was previously constructed only after
+// builder.Build(), passed directly into CoordinatorWiring.Wire below) so OrderLookupHandler can
+// receive it via constructor injection, matching OrderIntakeHandler's existing DI convention.
+builder.Services.AddSingleton<ISagaStateStore>(sp => new S3ArchivingSagaStateStore(
+    new MongoSagaStateStore(sp.GetRequiredService<IMongoDatabase>(), sagaStateCollectionName),
+    new S3EventArchiveWriter(sp.GetRequiredService<IAmazonS3>(), archiveBucketName),
+    sp.GetRequiredService<ILogger<S3ArchivingSagaStateStore>>()));
+
+builder.Services.AddSingleton<IInventoryEventStore>(sp => new S3ArchivingInventoryEventStore(
+    new MongoInventoryEventStore(sp.GetRequiredService<IMongoDatabase>(), inventoryEventsCollectionName),
+    new S3EventArchiveWriter(sp.GetRequiredService<IAmazonS3>(), archiveBucketName),
+    sp.GetRequiredService<ILogger<S3ArchivingInventoryEventStore>>()));
+
+builder.Services.AddSingleton<OrderLookupHandler>();
+
+var app = builder.Build();
+
+var sagaStateStore = app.Services.GetRequiredService<ISagaStateStore>();
 
 _ = CoordinatorWiring.Wire(new InboundEventBus(inboundBus), new OutboundEventBus(outboundBus), sagaStateStore);
 
@@ -96,5 +116,11 @@ app.MapGet("/health", () => Results.Ok());
 
 app.MapPost("/orders", (PlaceOrderRequest request, OrderIntakeHandler handler) =>
     handler.Handle(request) ? Results.Accepted() : Results.BadRequest());
+
+app.MapGet("/orders/{id}", async (string id, OrderLookupHandler handler, CancellationToken cancellationToken) =>
+{
+    var details = await handler.HandleAsync(id, cancellationToken);
+    return details is null ? Results.NotFound() : Results.Ok(details);
+});
 
 app.Run();
