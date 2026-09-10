@@ -5,10 +5,13 @@ namespace OrderSaga.Orchestration.CoordinatorHost;
 
 /// <summary>
 /// Logic behind the GET /orders/{id} endpoint, kept out of Program.cs for the same reason as
-/// OrderIntakeHandler: testable without WebApplicationFactory. Unlike Choreography, orchestration
-/// has a central SagaState carrying the order's current Step directly, so status doesn't need
-/// synthesizing from events -- but the inventory history still needs filtering to this order,
-/// since LoadEventsAsync(sku) returns every order's events for that SKU.
+/// OrderIntakeHandler: testable without WebApplicationFactory. Orchestration has a central
+/// SagaState, but its Step vocabulary (ReservingStock, AwaitingPayment, ...) doesn't match
+/// Choreography's -- `Status` is derived from Inventory event history the same way Choreography
+/// derives it (via OrderStatusProjection), so both stacks report status in one shared vocabulary;
+/// SagaState.Step is still exposed separately as `SagaStep`, richer orchestration-only detail.
+/// The inventory history itself needs filtering to this order, since LoadEventsAsync(sku) returns
+/// every order's events for that SKU.
 /// </summary>
 public sealed class OrderLookupHandler
 {
@@ -31,16 +34,10 @@ public sealed class OrderLookupHandler
         }
 
         var skuEvents = await _inventoryEventStore.LoadEventsAsync(state.Sku, cancellationToken);
-        var history = skuEvents.Where(e => GetOrderId(e) == orderId).ToList();
+        var history = skuEvents.Where(e => InventoryEventOrderId.TryGet(e) == orderId).ToList();
 
-        return new OrderDetails(orderId, state.Sku, state.Quantity, state.Amount, state.Step.ToString(), history);
+        var status = OrderStatusProjection.Project(history);
+        var entries = history.Select(OrderHistoryEntry.From).ToList();
+        return new OrderDetails(orderId, state.Sku, state.Quantity, state.Amount, status, entries, state.Step.ToString());
     }
-
-    private static string? GetOrderId(object @event) => @event switch
-    {
-        StockReserved e => e.OrderId,
-        ReservationConfirmed e => e.OrderId,
-        ReservationReleased e => e.OrderId,
-        _ => null,
-    };
 }

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { BFF_URL, type Stack } from "../api";
+import { BFF_URL, isValidOrderId, type Stack } from "../api";
 
 type PlaceOrderFormProps = {
   /** Defaults to the global fetch; injectable so tests can stub the BFF call without a mocking library. */
@@ -12,10 +12,20 @@ export function PlaceOrderForm({ fetchFn = fetch }: PlaceOrderFormProps) {
   const [quantity, setQuantity] = useState("");
   const [amount, setAmount] = useState("");
   const [stack, setStack] = useState<Stack>("choreography");
+  const [error, setError] = useState<string | null>(null);
+  const [placed, setPlaced] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    await fetchFn(`${BFF_URL}/orders`, {
+    setError(null);
+    setPlaced(false);
+
+    if (!isValidOrderId(orderId)) {
+      setError("Order ID must be 1-64 letters, digits, underscores, or hyphens.");
+      return;
+    }
+
+    const response = await fetchFn(`${BFF_URL}/orders`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -26,6 +36,13 @@ export function PlaceOrderForm({ fetchFn = fetch }: PlaceOrderFormProps) {
         amount: Number(amount),
       }),
     });
+
+    if (!response.ok) {
+      setError(`Order was rejected (status ${response.status}).`);
+      return;
+    }
+
+    setPlaced(true);
   }
 
   return (
@@ -45,6 +62,8 @@ export function PlaceOrderForm({ fetchFn = fetch }: PlaceOrderFormProps) {
         <option value="orchestration">Orchestration</option>
       </select>
       <button type="submit">Place Order</button>
+      {error && <p>{error}</p>}
+      {placed && <p>Order placed.</p>}
     </form>
   );
 }

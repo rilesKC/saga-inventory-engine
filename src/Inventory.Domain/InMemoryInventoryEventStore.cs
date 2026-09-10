@@ -54,20 +54,12 @@ public sealed class InMemoryInventoryEventStore : IInventoryEventStore
         {
             lock (list)
             {
-                matches.AddRange(list.Select(e => e.Event).Where(e => GetOrderId(e) == orderId));
+                matches.AddRange(list.Select(e => e.Event).Where(e => InventoryEventOrderId.TryGet(e) == orderId));
             }
         }
 
         return Task.FromResult<IReadOnlyList<object>>(matches);
     }
-
-    private static string? GetOrderId(object @event) => @event switch
-    {
-        StockReserved e => e.OrderId,
-        ReservationConfirmed e => e.OrderId,
-        ReservationReleased e => e.OrderId,
-        _ => null,
-    };
 
     public Task<IReadOnlyList<PendingOutboxEntry>> LoadUnpublishedAsync(CancellationToken cancellationToken)
     {

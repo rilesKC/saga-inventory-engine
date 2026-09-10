@@ -33,6 +33,8 @@ public class OrderLookupHandlerTests
         Assert.Equal(4, details.Quantity);
         Assert.Equal(199.99m, details.Amount);
         Assert.Equal("Confirmed", details.Status);
-        Assert.Equal([reserved, confirmed], details.History);
+        Assert.Equal(
+            [OrderHistoryEntry.From(reserved), OrderHistoryEntry.From(confirmed)],
+            details.History);
     }
 }

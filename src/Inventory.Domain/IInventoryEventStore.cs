@@ -17,8 +17,8 @@ public interface IInventoryEventStore
     /// All events across every SKU that carry this OrderId -- <see cref="StockReserved"/>,
     /// <see cref="ReservationConfirmed"/>, and <see cref="ReservationReleased"/> each do;
     /// <see cref="StockSeeded"/> never does, since it's a per-SKU infra event with no order
-    /// association, so it's never returned here. There's no OrderId index -- this is a full scan,
-    /// acceptable at this project's scale.
+    /// association, so it's never returned here. The Mongo implementation indexes OrderId
+    /// separately from the {Sku, Sequence} index this store's other reads use.
     /// </summary>
     Task<IReadOnlyList<object>> LoadEventsForOrderAsync(string orderId, CancellationToken cancellationToken);
 

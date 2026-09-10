@@ -29,6 +29,7 @@ public sealed class OrderLookupHandler
         }
 
         var status = OrderStatusProjection.Project(history);
-        return new OrderDetails(orderId, reserved.Sku, reserved.Quantity, reserved.Amount, status, history);
+        var entries = history.Select(OrderHistoryEntry.From).ToList();
+        return new OrderDetails(orderId, reserved.Sku, reserved.Quantity, reserved.Amount, status, entries);
     }
 }

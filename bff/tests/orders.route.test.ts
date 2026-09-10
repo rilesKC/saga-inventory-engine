@@ -68,6 +68,18 @@ describe("GET /orders/:id", () => {
     expect(calls).toEqual([`${config.orchestrationHostUrl}/orders/ORDER-UNKNOWN`]);
   });
 
+  it("returns 400 for an id that doesn't match the allowed order-id format, without calling the host", async () => {
+    const fetchStub: typeof fetch = async () => {
+      throw new Error("should not be called");
+    };
+    const { server, baseUrl } = await startTestServer(createOrdersRouter(fetchStub));
+    activeServer = server;
+
+    const res = await fetch(`${baseUrl}/orders/${encodeURIComponent("has spaces")}?stack=choreography`);
+
+    expect(res.status).toBe(400);
+  });
+
   it("normalizes a successful response into the unified shape", async () => {
     const hostBody = { orderId: "ORDER-1", sku: "SKU-1", quantity: 4, amount: 199.99, status: "Reserved", history: [] };
     const fetchStub: typeof fetch = async () =>

@@ -28,4 +28,31 @@ describe("PlaceOrderForm", () => {
       amount: 199.99,
     });
   });
+
+  it("rejects an order id outside the allowed format without calling the BFF", async () => {
+    const calls: unknown[] = [];
+    const fetchStub: typeof fetch = async () => {
+      calls.push(1);
+      throw new Error("should not be called");
+    };
+    render(<PlaceOrderForm fetchFn={fetchStub} />);
+
+    fireEvent.change(screen.getByLabelText(/order id/i), { target: { value: "has spaces" } });
+    fireEvent.change(screen.getByLabelText(/sku/i), { target: { value: "SKU-1" } });
+    fireEvent.click(screen.getByRole("button", { name: /place order/i }));
+
+    await waitFor(() => expect(screen.getByText(/1-64 letters/i)).toBeInTheDocument());
+    expect(calls).toHaveLength(0);
+  });
+
+  it("shows an error message when the BFF rejects the order", async () => {
+    const fetchStub: typeof fetch = async () => new Response(null, { status: 400 });
+    render(<PlaceOrderForm fetchFn={fetchStub} />);
+
+    fireEvent.change(screen.getByLabelText(/order id/i), { target: { value: "ORDER-1" } });
+    fireEvent.change(screen.getByLabelText(/sku/i), { target: { value: "SKU-1" } });
+    fireEvent.click(screen.getByRole("button", { name: /place order/i }));
+
+    await waitFor(() => expect(screen.getByText(/rejected/i)).toBeInTheDocument());
+  });
 });

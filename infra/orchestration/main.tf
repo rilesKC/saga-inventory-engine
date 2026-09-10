@@ -106,6 +106,9 @@ locals {
         { name = "Dynamo__IdempotencyTableName", value = module.idempotency.table_name },
         { name = "Mongo__DatabaseName", value = "orchestration" },
         { name = "Mongo__SagaStateCollectionName", value = "saga-state" },
+        # Read-only from the coordinator's side -- same collection the `inventory` service below
+        # writes to, needed so GET /orders/{id} can read an order's Inventory event history.
+        { name = "Mongo__InventoryEventsCollectionName", value = "inventory-events" },
         { name = "S3__ArchiveBucketName", value = module.persistence.archive_bucket_name },
         # New Relic's own literal env var name, not a .NET config key -- no double-underscore.
         { name = "NEW_RELIC_APP_NAME", value = "${var.name}-coordinator" },

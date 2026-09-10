@@ -1,11 +1,11 @@
-using Inventory.Domain;
-
-namespace OrderSaga.Choreography.Host;
+namespace Inventory.Domain;
 
 /// <summary>
-/// Choreography has no central SagaState to read (see OrderLookupHandler's doc comment), so an
-/// order's status is synthesized here from the last matching Inventory event instead -- the same
-/// events history already returned alongside this.
+/// Derives an order's status from its Inventory event history. Shared by both saga stacks'
+/// GET /orders/{id} handlers so the two stacks report the same status vocabulary for the same
+/// real-world state -- Choreography has no central SagaState to read at all, and Orchestration
+/// uses this instead of exposing its raw SagaStep as `status` (SagaStep is still available
+/// separately as orchestration-only detail).
 /// </summary>
 public static class OrderStatusProjection
 {

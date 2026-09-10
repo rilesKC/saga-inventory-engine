@@ -1,6 +1,4 @@
-using Inventory.Domain;
-
-namespace OrderSaga.Choreography.Host.Tests;
+namespace Inventory.Domain.Tests;
 
 public class OrderStatusProjectionTests
 {
