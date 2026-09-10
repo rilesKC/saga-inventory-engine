@@ -141,23 +141,31 @@ Spec: docs/specs/bff-web-client.md
 
 ### Web (React + TypeScript, local-only)
 
-- [ ] 12. Scaffold the React app (Vite + TypeScript)
+- [x] 12. Scaffold the React app (Vite + TypeScript)
       - File(s): web/package.json, web/vite.config.ts, web/src/main.tsx, web/src/App.tsx (new)
       - Verification: `npm run dev` starts the Vite dev server; default page loads in a browser
 
-- [ ] 13. `PlaceOrderForm` component (OrderId, Sku, Quantity, Amount, stack selector) — submits to
+- [x] 13. `PlaceOrderForm` component (OrderId, Sku, Quantity, Amount, stack selector) — submits to
       the BFF's `POST /orders`
       - File(s): web/src/components/PlaceOrderForm.tsx (new)
       - Test: web/tests/PlaceOrderForm.test.tsx (Vitest + React Testing Library) — submitting the
         form calls the BFF's `POST /orders` with the entered values
 
-- [ ] 14. `OrderLookup` component (OrderId input + stack selector) — calls the BFF's
+- [x] 14. `OrderLookup` component (OrderId input + stack selector) — calls the BFF's
       `GET /orders/:id`, renders status + history, shows a not-found message on 404
       - File(s): web/src/components/OrderLookup.tsx (new)
       - Test: web/tests/OrderLookup.test.tsx — looking up a known order renders its status and
         history; looking up an unknown order renders a not-found message
 
-- [ ] 15. Wire both components into `App.tsx`; manual end-to-end pass
+- [x] 15. Wire both components into `App.tsx`; manual end-to-end pass
+      - ⚠ Retro: splitting the BFF (tasks 9-11) and web client (tasks 12-15) into separate task
+        groups meant neither plan entry named CORS -- a cross-origin concern invisible until the
+        two are actually run together in a real browser, which only this task's own verification
+        step could surface. Live testing caught it (the browser blocked the request outright);
+        fixed in `bff/src/index.ts`/`package.json` (added the `cors` middleware), both outside
+        this task's stated `File(s)` list. A future plan splitting a backend and its browser
+        client into separate task groups should name CORS explicitly as a risk to check for in
+        whichever task first runs them together, rather than leaving it to be discovered.
       - File(s): web/src/App.tsx
       - Verification: run both .NET hosts locally (per docs/localstack-setup*.md), the BFF, and the
         React dev server together; place an order through each stack via the UI, look up each by
